@@ -1,0 +1,671 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Copper Dreams</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<style>
+/* Layout: one centred CRT stage, a gadget row beneath, a short note at the bottom.
+   Palette: night violet ground, hot pink, cyan and gold as the three phosphor accents. */
+:root {
+  --bg: #07050d;
+  --panel: #120c22;
+  --edge: #2e2260;
+  --ink: #ddd6ff;
+  --dim: #9a91c8;
+  --hot: #ff5fa8;
+  --cyan: #4fe3ff;
+  --gold: #ffd24a;
+  --pixel: "Press Start 2P", ui-monospace, Menlo, Consolas, monospace;
+  --mono: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); }
+body {
+  color: var(--ink);
+  font: 14px/1.6 var(--mono);
+  padding-block: 20px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 980px; margin: 0 auto; display: grid; gap: 14px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+h1 { margin: 0; font: 15px/1.4 var(--pixel); color: var(--gold); letter-spacing: 0.04em; text-wrap: balance; }
+header p { margin: 0; color: var(--dim); font-size: 13px; }
+
+.stage { position: relative; border: 2px solid var(--edge); border-radius: 8px; background: #000; box-shadow: 0 0 48px rgba(120, 80, 255, 0.2); overflow: hidden; }
+.stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 5 / 4; image-rendering: pixelated; image-rendering: crisp-edges; image-rendering: pixelated; background: #000; }
+.stage::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.16) 0, rgba(0, 0, 0, 0.16) 1px, transparent 1px, transparent 3px);
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.55);
+}
+.stage:fullscreen { display: grid; place-items: center; border: 0; border-radius: 0; }
+.stage:fullscreen canvas { width: auto; height: 100%; max-width: 100%; }
+
+.start { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; border: 0; padding: 12px; cursor: pointer; background: rgba(6, 3, 14, 0.55); color: #fff; font-family: var(--pixel); }
+.start:focus-visible { outline: 3px solid var(--gold); outline-offset: -6px; }
+.start .box { display: grid; gap: 14px; justify-items: center; padding: 22px 28px; background: #0d0a24; border: 3px solid var(--gold); box-shadow: 6px 6px 0 #000; max-width: 100%; }
+.start .big { font-size: clamp(16px, 4.2vw, 30px); color: var(--gold); letter-spacing: 0.08em; }
+.start .small { font-size: clamp(7px, 1.6vw, 10px); line-height: 1.8; color: var(--cyan); text-align: center; animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0.2; } }
+@media (prefers-reduced-motion: reduce) { .start .small { animation: none; } }
+
+.gadgets { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.gadgets button { font: 10px/1 var(--pixel); color: var(--ink); background: var(--panel); border: 2px solid var(--edge); border-radius: 0; padding: 11px 14px; cursor: pointer; box-shadow: 3px 3px 0 #000; }
+.gadgets button:hover { border-color: var(--cyan); color: #fff; }
+.gadgets button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+.gadgets button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.gadgets button[aria-pressed="true"] { border-color: var(--hot); color: var(--hot); }
+.gadgets .keys { color: var(--dim); font-size: 12px; }
+.note { margin: 0; max-width: 72ch; color: var(--dim); font-size: 13px; }
+.note b { color: var(--ink); font-weight: 600; }
+</style>
+
+<main>
+  <header>
+    <h1>COPPER DREAMS</h1>
+    <p>Intro im Stil der Amiga-500-Szene, komplett im Browser</p>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="screen" width="320" height="256" role="img" aria-label="Demo mit Copper Bars, Glenz-Würfel, Plasma, Sinus-Scroller und Tracker-Anzeige"></canvas>
+    <button class="start" id="start" type="button">
+      <span class="box">
+        <span class="big">START</span>
+        <span class="small">KLICK STARTET DEMO + TON</span>
+      </span>
+    </button>
+  </div>
+
+  <div class="gadgets">
+    <button id="snd" type="button" aria-pressed="false">TON AN</button>
+    <button id="fs" type="button">VOLLBILD</button>
+    <span class="keys">Taste M: Ton · Taste F: Vollbild</span>
+  </div>
+
+  <p class="note"><b>Szene 1</b> zeigt Copper Bars, einen Glenz-Vektorwürfel und ein Sternenfeld. <b>Szene 2</b> bringt Plasma und einen rotierenden Punkt-Torus. Der Sound läuft auf vier Kanälen mit 8-Bit-Samples, links und rechts verteilt wie bei Paula. Unten siehst du die vier Oszilloskope und die Pattern-Ansicht des Trackers.</p>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var W = 320, H = 256;
+  var cv = document.getElementById('screen');
+  var ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  var offCv = document.createElement('canvas');
+  offCv.width = W; offCv.height = H;
+  var offg = offCv.getContext('2d');
+
+  var FONT = '"Press Start 2P", ui-monospace, Menlo, Consolas, monospace';
+  var calm = false;
+  try { calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  /* ---------- helpers ---------- */
+  var q = function (v) { return (Math.max(0, Math.min(255, v)) >> 4) * 17; }; /* 12-bit Amiga colour */
+  var rgb = function (r, g, b) { return 'rgb(' + q(r) + ',' + q(g) + ',' + q(b) + ')'; };
+  var mix = function (a, b, u) { return a + (b - a) * u; };
+  var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
+  var seed = 1234567;
+  var rnd = function () { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+
+  /* ---------- song data (shared by sound and tracker display) ---------- */
+  var ROW = 0.12;            /* 125 BPM, speed 6 */
+  var SONG_ROWS = 256;       /* 16 bars of 16 rows */
+  var PROG = [
+    { r: 57, m: 1 }, { r: 53, m: 0 }, { r: 48, m: 0 }, { r: 55, m: 0 },
+    { r: 57, m: 1 }, { r: 53, m: 0 }, { r: 55, m: 0 }, { r: 52, m: 0 }
+  ];
+  var NN = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+  var DN = { K: 'KCK', S: 'SNR', H: 'HAT', O: 'OHH' };
+  var noteName = function (m) { return NN[m % 12] + (Math.floor(m / 12) - 1); };
+  var freqOf = function (m) { return 440 * Math.pow(2, (m - 69) / 12); };
+  var BASS = { 0: 0, 3: 0, 6: 12, 8: 0, 10: 12, 12: 0, 14: 7 };
+  var LEAD_ROWS = { 0: 0, 3: 1, 6: 2, 8: 3, 11: 4, 14: 5 };
+  var CONT_A = [3, 4, 5, 4, 3, 2];
+  var CONT_B = [5, 4, 3, 2, 4, 5];
+  var ARP = [0, 1, 2, 1];
+
+  function ev(rowIn) {
+    var row = ((rowIn % SONG_ROWS) + SONG_ROWS) % SONG_ROWS;
+    var bar = row >> 4, r = row & 15;
+    var ch = PROG[bar % 8];
+    var iv = ch.m ? [0, 3, 7] : [0, 4, 7];
+    var tone = function (i) { return ch.r + iv[i % 3] + 12 * Math.floor(i / 3); };
+    var out = [null, null, null, null];
+    if (r in BASS) out[0] = { m: ch.r - 12 + BASS[r] };
+    if (bar >= 4 && r in LEAD_ROWS) {
+      var c = ((bar >> 2) & 1) ? CONT_A : CONT_B;
+      out[1] = { m: tone(c[LEAD_ROWS[r]]) };
+    }
+    out[2] = { m: tone(ARP[r % 4]) };
+    if (bar >= 2) {
+      var d = null;
+      if (r === 0 || r === 8 || (r === 11 && (bar & 1))) d = 'K';
+      else if (r === 4 || r === 12) d = 'S';
+      else if (r % 4 === 2) d = 'H';
+      if (bar % 8 === 7 && r >= 12) d = 'S';
+      if (bar >= 8 && r === 15 && bar % 8 !== 7) d = 'O';
+      if (d) out[3] = { d: d };
+    }
+    return out;
+  }
+
+  /* ---------- audio ---------- */
+  var actx = null, master = null, audioOn = false, muted = false;
+  var songStart = 0, nextRow = 0, timer = null;
+  var chans = [], bufs = {};
+  var PAN = [-0.65, 0.65, 0.65, -0.65]; /* Paula: left, right, right, left */
+
+  function mkWave(N, fn) {
+    var b = actx.createBuffer(1, N, 44100);
+    var d = b.getChannelData(0);
+    for (var i = 0; i < N; i++) d[i] = Math.round(clamp(fn(i, N), -1, 1) * 127) / 128;
+    return b;
+  }
+  function mkShot(sr, secs, fn) {
+    var n = Math.floor(sr * secs);
+    var b = actx.createBuffer(1, n, sr);
+    var d = b.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = Math.round(clamp(fn(i / sr, i), -1, 1) * 127) / 128;
+    return b;
+  }
+
+  function initAudio() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    actx = new AC();
+    master = actx.createGain();
+    master.gain.value = muted ? 0 : 0.7;
+    var lp = actx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 6500; lp.Q.value = 0.6;
+    var comp = actx.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 5;
+    master.connect(lp); lp.connect(comp); comp.connect(actx.destination);
+
+    for (var i = 0; i < 4; i++) {
+      var inG = actx.createGain();
+      var an = actx.createAnalyser();
+      an.fftSize = 2048;
+      var last = inG;
+      if (actx.createStereoPanner) {
+        var pan = actx.createStereoPanner();
+        pan.pan.value = PAN[i];
+        inG.connect(pan); last = pan;
+      }
+      last.connect(an); an.connect(master);
+      chans.push({ inp: inG, an: an, buf: new Uint8Array(an.fftSize) });
+    }
+
+    bufs.bass = mkWave(64, function (i, N) { return 0.9 * (2 * i / N - 1); });
+    bufs.lead = mkWave(64, function (i, N) { return i < N / 2 ? 0.8 : -0.8; });
+    bufs.arp = mkWave(64, function (i, N) { return i < N / 4 ? 0.8 : -0.8; });
+
+    var ph = 0;
+    bufs.K = mkShot(22050, 0.32, function (t) {
+      ph += 2 * Math.PI * (42 + 130 * Math.exp(-t * 32)) / 22050;
+      return Math.sin(ph) * Math.exp(-t * 9) * 1.1;
+    });
+    var tph = 0;
+    bufs.S = mkShot(22050, 0.24, function (t) {
+      tph += 2 * Math.PI * 190 / 22050;
+      return (rnd() * 2 - 1) * Math.exp(-t * 18) * 0.8 + Math.sin(tph) * Math.exp(-t * 26) * 0.5;
+    });
+    var prevH = 0;
+    bufs.H = mkShot(22050, 0.08, function (t) {
+      var n = rnd() * 2 - 1, hp = n - prevH; prevH = n;
+      return hp * 0.6 * Math.exp(-t * 70);
+    });
+    var prevO = 0;
+    bufs.O = mkShot(22050, 0.32, function (t) {
+      var n = rnd() * 2 - 1, hp = n - prevO; prevO = n;
+      return hp * 0.5 * Math.exp(-t * 13);
+    });
+    return true;
+  }
+
+  function note(ci, buf, m, t, dur, vol, vib) {
+    var c = chans[ci];
+    var s = actx.createBufferSource();
+    s.buffer = buf; s.loop = true;
+    s.playbackRate.value = freqOf(m) * buf.length / buf.sampleRate;
+    var g = actx.createGain(), gp = g.gain;
+    gp.setValueAtTime(0.0001, t);
+    gp.linearRampToValueAtTime(vol, t + 0.005);
+    gp.linearRampToValueAtTime(vol * 0.55, t + dur * 0.6);
+    gp.linearRampToValueAtTime(0, t + dur);
+    s.connect(g); g.connect(c.inp);
+    if (vib) {
+      var l = actx.createOscillator(), lg = actx.createGain();
+      l.frequency.value = 6; lg.gain.value = 12;
+      l.connect(lg); lg.connect(s.detune);
+      l.start(t); l.stop(t + dur + 0.05);
+    }
+    s.start(t); s.stop(t + dur + 0.02);
+  }
+  function hit(ci, buf, t, vol) {
+    var s = actx.createBufferSource();
+    s.buffer = buf;
+    var g = actx.createGain();
+    g.gain.value = vol;
+    s.connect(g); g.connect(chans[ci].inp);
+    s.start(t);
+  }
+  function play(row, t) {
+    var e = ev(row);
+    if (e[0]) note(0, bufs.bass, e[0].m, t, 0.24, 0.5, false);
+    if (e[1]) note(1, bufs.lead, e[1].m, t, 0.30, 0.2, true);
+    if (e[2]) note(2, bufs.arp, e[2].m, t, 0.10, 0.16, false);
+    if (e[3]) hit(3, bufs[e[3].d], t, e[3].d === 'K' ? 0.9 : (e[3].d === 'S' ? 0.6 : 0.28));
+  }
+  function pump() {
+    if (!audioOn) return;
+    while (songStart + nextRow * ROW < actx.currentTime + 0.25) {
+      play(nextRow, songStart + nextRow * ROW);
+      nextRow++;
+    }
+  }
+
+  /* ---------- clock ---------- */
+  var t0 = performance.now();
+  function T() {
+    if (audioOn) return Math.max(0, actx.currentTime - songStart);
+    if (calm) return 0;
+    return (performance.now() - t0) / 1000;
+  }
+  var beat = 0;
+  function kickPulse(rowPos) {
+    var base = Math.floor(rowPos);
+    for (var k = 0; k < 16; k++) {
+      if (base - k < 0) break;
+      var e = ev(base - k)[3];
+      if (e && e.d === 'K') return Math.exp(-((rowPos - (base - k)) * ROW) * 7);
+    }
+    return 0;
+  }
+
+  /* ---------- scene A: sky, stars, copper bars, glenz cubes ---------- */
+  var skyCv = document.createElement('canvas');
+  skyCv.width = W; skyCv.height = H;
+  function buildSky() {
+    var g = skyCv.getContext('2d');
+    for (var y = 0; y < H; y++) {
+      var u = y / (H - 1), r, gc, b, k;
+      if (u < 0.55) { k = u / 0.55; r = mix(14, 92, k); gc = mix(8, 24, k); b = mix(64, 130, k); }
+      else { k = (u - 0.55) / 0.45; r = mix(92, 255, k); gc = mix(24, 128, k * k); b = mix(130, 96, k); }
+      g.fillStyle = rgb(r, gc, b);
+      g.fillRect(0, y, W, 1);
+    }
+  }
+
+  var STARS = [];
+  for (var si = 0; si < 96; si++) STARS.push({ x: rnd() * W, y: rnd() * 150, l: si % 3 });
+  var SSP = [12, 30, 64], SSC = ['#6f6aa8', '#b9b5f0', '#ffffff'];
+  function drawStars(g, t) {
+    for (var i = 0; i < STARS.length; i++) {
+      var s = STARS[i];
+      var x = (((s.x - t * SSP[s.l]) % W) + W) % W;
+      g.fillStyle = SSC[s.l];
+      g.fillRect(x | 0, s.y | 0, s.l === 2 ? 2 : 1, 1);
+    }
+  }
+
+  var BC = [[255, 64, 80], [255, 150, 40], [255, 225, 70], [90, 255, 130], [60, 220, 255], [100, 120, 255], [205, 90, 255], [255, 90, 190], [255, 255, 255]];
+  function drawBars(g, t) {
+    var bars = [];
+    for (var i = 0; i < 9; i++) {
+      var ph = t * 1.15 + i * 0.46;
+      bars.push({ i: i, y: 112 + Math.sin(ph) * 50, z: Math.cos(ph) });
+    }
+    bars.sort(function (a, b) { return a.z - b.z; });
+    for (var n = 0; n < bars.length; n++) {
+      var b = bars[n], c = BC[b.i];
+      for (var k = 0; k < 18; k++) {
+        var s = Math.sin((k + 0.5) / 18 * Math.PI);
+        var w = Math.pow(s, 6) * 0.7, l = 0.22 + 0.78 * s;
+        g.fillStyle = rgb(mix(c[0] * l, 255, w), mix(c[1] * l, 255, w), mix(c[2] * l, 255, w));
+        g.fillRect(0, Math.round(b.y) - 9 + k, W, 1);
+      }
+    }
+  }
+
+  var CV = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
+  var CF = [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [2, 3, 7, 6], [1, 2, 6, 5], [0, 3, 7, 4]];
+  var COL1 = ['rgba(255,70,110,.30)', 'rgba(70,210,255,.30)', 'rgba(255,210,70,.30)', 'rgba(110,255,120,.30)', 'rgba(190,110,255,.30)', 'rgba(255,255,255,.22)'];
+  var COL2 = ['rgba(70,210,255,.42)', 'rgba(255,70,110,.42)', 'rgba(190,110,255,.42)', 'rgba(255,210,70,.42)', 'rgba(110,255,120,.42)', 'rgba(255,255,255,.30)'];
+
+  function drawCube(g, cx, cy, size, ax, ay, az, cols, edge) {
+    var ca = Math.cos(ax), sa = Math.sin(ax), cb = Math.cos(ay), sb = Math.sin(ay), cc = Math.cos(az), sc = Math.sin(az);
+    var P = CV.map(function (v) {
+      var x = v[0], y = v[1], z = v[2], t1;
+      t1 = y * ca - z * sa; z = y * sa + z * ca; y = t1;
+      t1 = x * cb + z * sb; z = -x * sb + z * cb; x = t1;
+      t1 = x * cc - y * sc; y = x * sc + y * cc; x = t1;
+      var f = 5 / (5 + z);
+      return { x: Math.round(cx + x * size * f), y: Math.round(cy + y * size * f), z: z };
+    });
+    var faces = CF.map(function (f, i) {
+      return { f: f, i: i, z: (P[f[0]].z + P[f[1]].z + P[f[2]].z + P[f[3]].z) / 4 };
+    }).sort(function (a, b) { return b.z - a.z; });
+    var path = function (f) {
+      g.beginPath();
+      for (var k = 0; k < 4; k++) {
+        var p = P[f[k]];
+        if (k) g.lineTo(p.x, p.y); else g.moveTo(p.x, p.y);
+      }
+      g.closePath();
+    };
+    g.globalCompositeOperation = 'lighter';
+    for (var n = 0; n < faces.length; n++) { g.fillStyle = cols[faces[n].i]; path(faces[n].f); g.fill(); }
+    g.globalCompositeOperation = 'source-over';
+    g.strokeStyle = edge; g.lineWidth = 1;
+    for (var m = 0; m < faces.length; m++) { path(faces[m].f); g.stroke(); }
+  }
+
+  function sceneA(g, t) {
+    g.drawImage(skyCv, 0, 0);
+    drawStars(g, t);
+    drawBars(g, t);
+    var sz = 40 * (1 + 0.16 * beat);
+    var cx = 160 + Math.sin(t * 0.8) * 58, cy = 122 + Math.sin(t * 1.6) * 10;
+    drawCube(g, cx, cy, sz, t * 0.7, t * 1.1, t * 0.45, COL1, 'rgba(255,255,255,0.9)');
+    drawCube(g, cx, cy, sz * 0.52, -t * 0.9, -t * 1.3, t * 0.6, COL2, 'rgba(255,230,160,0.9)');
+  }
+
+  /* ---------- scene B: plasma + dot torus ---------- */
+  var PW = 80, PH = 64;
+  var pc = document.createElement('canvas');
+  pc.width = PW; pc.height = PH;
+  var pctx = pc.getContext('2d');
+  var pimg = pctx.createImageData(PW, PH);
+  var pd = pimg.data;
+  var PAL = new Uint8Array(256 * 3);
+  for (var pi = 0; pi < 256; pi++) {
+    var pa = pi / 256 * Math.PI * 2;
+    PAL[pi * 3] = q((128 + 127 * Math.sin(pa)) * 0.85);
+    PAL[pi * 3 + 1] = q((100 + 100 * Math.sin(pa + 2.2)) * 0.85);
+    PAL[pi * 3 + 2] = q((140 + 115 * Math.sin(pa + 4.1)) * 0.85);
+  }
+  function drawPlasma(g, t) {
+    var p = 0;
+    var cx = PW / 2 + Math.sin(t * 0.9) * 22, cy = PH / 2 + Math.cos(t * 1.1) * 14;
+    for (var y = 0; y < PH; y++) {
+      var sy = Math.sin(y * 0.21 - t * 0.9);
+      for (var x = 0; x < PW; x++) {
+        var dx = x - cx, dy = y - cy;
+        var v = Math.sin(x * 0.15 + t * 1.1) + sy + Math.sin((x + y) * 0.1 + t * 0.7) + Math.sin(Math.sqrt(dx * dx + dy * dy) * 0.22 - t * 1.6);
+        var i = (((v + 4) * 32 + t * 36) & 255) * 3;
+        pd[p] = PAL[i]; pd[p + 1] = PAL[i + 1]; pd[p + 2] = PAL[i + 2]; pd[p + 3] = 255;
+        p += 4;
+      }
+    }
+    pctx.putImageData(pimg, 0, 0);
+    g.drawImage(pc, 0, 0, W, H);
+  }
+
+  var TP = [];
+  for (var tu = 0; tu < 30; tu++) {
+    for (var tv = 0; tv < 14; tv++) {
+      var ta = tu / 30 * 2 * Math.PI, tb = tv / 14 * 2 * Math.PI;
+      var trr = 1 + 0.45 * Math.cos(tb);
+      TP.push([trr * Math.cos(ta), trr * Math.sin(ta), 0.45 * Math.sin(tb), tu & 1]);
+    }
+  }
+  var TC = [], MC = [];
+  for (var li = 0; li < 16; li++) {
+    var bl = li / 15;
+    TC.push(rgb(bl * 90, bl * 235, bl * 255));
+    MC.push(rgb(bl * 255, bl * 90, bl * 205));
+  }
+  var shade = ctx.createLinearGradient(0, 0, 0, H);
+  shade.addColorStop(0, 'rgba(0,0,0,0.55)');
+  shade.addColorStop(0.35, 'rgba(0,0,0,0)');
+  shade.addColorStop(0.65, 'rgba(0,0,0,0)');
+  shade.addColorStop(1, 'rgba(0,0,0,0.6)');
+
+  function drawTorus(g, t) {
+    var ax = t * 0.8, ay = t * 0.55;
+    var ca = Math.cos(ax), sa = Math.sin(ax), cb = Math.cos(ay), sb = Math.sin(ay);
+    var sc = 64 * (1 + 0.1 * beat), ox = 160 + Math.sin(t * 0.7) * 40;
+    for (var i = 0; i < TP.length; i++) {
+      var p = TP[i], x = p[0], y = p[1], z = p[2];
+      var y1 = y * ca - z * sa, z1 = y * sa + z * ca;
+      var x2 = x * cb + z1 * sb, z2 = -x * sb + z1 * cb;
+      var f = 4 / (4 + z2);
+      var X = ox + x2 * sc * f, Y = 126 + y1 * sc * f;
+      var lv = Math.round(clamp(0.62 - z2 * 0.4, 0.1, 1) * 15);
+      g.fillStyle = (p[3] ? MC : TC)[lv];
+      var s = z2 < 0 ? 3 : 2;
+      g.fillRect(Math.round(X), Math.round(Y), s, s);
+    }
+  }
+
+  function sceneB(g, t) {
+    drawPlasma(g, t);
+    g.fillStyle = shade;
+    g.fillRect(0, 0, W, H);
+    drawTorus(g, t);
+  }
+
+  function drawScene(g, i, t) { if (i === 0) sceneA(g, t); else sceneB(g, t); }
+
+  /* ---------- logo and scroller ---------- */
+  var logoCv = null, scrollCv = null, scrollW = 0;
+  var SCROLL_TEXT = '                    HALLO UND WILLKOMMEN ZU COPPER DREAMS - EINER KLEINEN HOMMAGE AN DIE GROSSEN TAGE DER AMIGA 500 SZENE.  DAMALS HIESS ES: DISKETTE REIN, MAUS KLICKEN, STAUNEN.  HEUTE LAEUFT ALLES IM BROWSER: VIER KANAELE SOUND, COPPER BARS, GLENZ VECTORS, PLASMA UND EIN BISSCHEN SINUS.  ALLE FARBEN KOMMEN AUS 12 BIT, ALLE SAMPLES AUS 8 BIT, ALLES ANDERE AUS PURER LIEBE ZUM DETAIL.  GREETINGS GEHEN AN ALLE, DIE NACHTS UM DREI NOCH EINEN TRACKER OFFEN HATTEN, AN JEDEN, DER MAL EINE DISKETTE MIT EDDING BESCHRIFTET HAT, UND AN ALLE, DIE BEI EINEM GUTEN BASS LAECHELN MUSSTEN.  TASTE M SCHALTET DEN TON AUS UND WIEDER AN.  UND JETZT VON VORN...                    ';
+
+  function buildLogo() {
+    var c = document.createElement('canvas');
+    c.width = W; c.height = 76;
+    var g = c.getContext('2d');
+    g.font = '32px ' + FONT;
+    g.textAlign = 'center'; g.textBaseline = 'top'; g.lineJoin = 'round';
+    [['COPPER', 0], ['DREAMS', 38]].forEach(function (a) {
+      var s = a[0], y = a[1];
+      g.lineWidth = 8; g.strokeStyle = '#05030c';
+      g.strokeText(s, 160, y + 2);
+      var gr = g.createLinearGradient(0, y, 0, y + 32);
+      gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.46, '#8fe3ff');
+      gr.addColorStop(0.5, '#1c2f6e'); gr.addColorStop(0.54, '#ffd27a'); gr.addColorStop(1, '#ff4f8a');
+      g.fillStyle = gr;
+      g.fillText(s, 160, y);
+    });
+    return c;
+  }
+  function buildScroller() {
+    var m = document.createElement('canvas').getContext('2d');
+    m.font = '16px ' + FONT;
+    scrollW = Math.ceil(m.measureText(SCROLL_TEXT).width);
+    var c = document.createElement('canvas');
+    c.width = scrollW; c.height = 28;
+    var g = c.getContext('2d');
+    g.font = '16px ' + FONT;
+    g.textBaseline = 'top';
+    g.fillStyle = '#000'; g.fillText(SCROLL_TEXT, 2, 6);
+    var gr = g.createLinearGradient(0, 4, 0, 20);
+    gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.5, '#8fe9ff'); gr.addColorStop(0.5, '#ffc36b'); gr.addColorStop(1, '#ff4fa0');
+    g.fillStyle = gr; g.fillText(SCROLL_TEXT, 0, 4);
+    return c;
+  }
+
+  function txt(s, x, y, color, size, align) {
+    ctx.font = (size || 8) + 'px ' + FONT;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = align || 'left';
+    ctx.fillStyle = color;
+    ctx.fillText(s, x, y);
+  }
+
+  /* ---------- bottom panel: scopes + tracker ---------- */
+  var SCOL = ['#58e6ff', '#ffd24a', '#7dff8e', '#ff6fae'];
+  function drawPanel(t, rowPos) {
+    ctx.fillStyle = '#0b0716';
+    ctx.fillRect(0, 214, W, 42);
+    for (var x = 0; x < W; x += 8) {
+      ctx.fillStyle = rgb(128 + 127 * Math.sin(x * 0.03 + t * 2), 128 + 127 * Math.sin(x * 0.03 + t * 2 + 2.1), 128 + 127 * Math.sin(x * 0.03 + t * 2 + 4.2));
+      ctx.fillRect(x, 214, 8, 2);
+    }
+    var i, y;
+    for (i = 0; i < 4; i++) {
+      y = 218 + i * 9;
+      ctx.fillStyle = '#150e29';
+      ctx.fillRect(4, y, 120, 8);
+      ctx.fillStyle = SCOL[i];
+      if (audioOn) {
+        var d = chans[i].buf;
+        chans[i].an.getByteTimeDomainData(d);
+        var py = null;
+        for (var xx = 0; xx < 120; xx++) {
+          var v = (d[xx * 16] - 128) / 128;
+          var yy = y + 4 + Math.round(clamp(v * 3.2, -1, 1) * 3.5);
+          var y0 = py === null ? yy : py;
+          ctx.fillRect(4 + xx, Math.min(yy, y0), 1, Math.abs(yy - y0) + 1);
+          py = yy;
+        }
+      } else {
+        ctx.fillRect(4, y + 4, 120, 1);
+      }
+    }
+    var cur = Math.floor(rowPos);
+    for (var k = -2; k <= 2; k++) {
+      var row = cur + k;
+      y = 216 + (k + 2) * 8;
+      if (k === 0) { ctx.fillStyle = '#3a2a78'; ctx.fillRect(130, y, 190, 8); }
+      if (row < 0) continue;
+      var e = ev(row);
+      var hex = (row % 64).toString(16).toUpperCase();
+      if (hex.length < 2) hex = '0' + hex;
+      ctx.globalAlpha = k === 0 ? 1 : 0.55;
+      txt(hex, 134, y, k === 0 ? '#ffffff' : '#9a91c8');
+      for (var c = 0; c < 4; c++) {
+        var s = e[c] ? (e[c].m !== undefined ? noteName(e[c].m) : DN[e[c].d]) : '---';
+        txt(s, 158 + c * 32, y, SCOL[c]);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /* ---------- main loop ---------- */
+  function frame() {
+    var t = T(), rowPos = t / ROW;
+    beat = kickPulse(rowPos);
+
+    var sec = Math.floor(rowPos / 128), idx = sec & 1, sr = rowPos - sec * 128;
+    var trans = (sec > 0 && sr < 12) ? sr / 12 : -1;
+    if (trans >= 0) {
+      drawScene(ctx, 1 - idx, t);
+      drawScene(offg, idx, t);
+      var n = 16, sw = W / n;
+      for (var i = 0; i < n; i++) {
+        var kk = clamp(trans * 1.7 - i / n * 0.7, 0, 1);
+        var wd = Math.ceil(kk * sw);
+        if (wd > 0) ctx.drawImage(offCv, i * sw, 0, wd, H, i * sw, 0, wd, H);
+      }
+    } else {
+      drawScene(ctx, idx, t);
+    }
+
+    for (var x = 0; x < W; x += 4) {
+      ctx.fillStyle = rgb(128 + 127 * Math.sin(x * 0.05 - t * 3), 128 + 127 * Math.sin(x * 0.05 - t * 3 + 2.1), 128 + 127 * Math.sin(x * 0.05 - t * 3 + 4.2));
+      ctx.fillRect(x, 0, 4, 2);
+    }
+
+    if (logoCv) {
+      var amp = 8 * (0.6 + 0.4 * Math.sin(t * 0.7));
+      for (var y = 0; y < 76; y++) {
+        var dx = Math.round(Math.sin(y * 0.22 + t * 3.2) * amp);
+        ctx.drawImage(logoCv, 0, y, W, 1, dx, 4 + y, W, 1);
+      }
+      var sub = ['#8fe3ff', '#ffd27a', '#ff8ac0'][Math.floor(t * 2) % 3];
+      txt('4 CHANNELS - 8 BIT - 50 HZ', 160, 84, sub, 8, 'center');
+    }
+
+    if (scrollCv) {
+      var off = Math.floor(t * 86);
+      for (var sx = 0; sx < W; sx += 2) {
+        var src = (off + sx) % scrollW;
+        var oy = Math.round(Math.sin(sx * 0.035 + t * 3.3) * 13);
+        ctx.drawImage(scrollCv, src, 0, 2, 28, sx, 176 + oy, 2, 28);
+      }
+    }
+
+    drawPanel(t, rowPos);
+
+    if (beat > 0.02) {
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.09 * beat).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, 214);
+    }
+    var fade = (calm && !audioOn) ? 1 : clamp(t / 1.2, 0, 1);
+    if (fade < 1) {
+      ctx.fillStyle = 'rgba(0,0,0,' + (1 - fade).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- UI ---------- */
+  var stage = document.getElementById('stage');
+  var startBtn = document.getElementById('start');
+  var sndBtn = document.getElementById('snd');
+  var fsBtn = document.getElementById('fs');
+  var started = false;
+
+  function setMuted(m) {
+    muted = m;
+    sndBtn.textContent = muted ? 'TON AUS' : 'TON AN';
+    sndBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    if (master) master.gain.value = muted ? 0 : 0.7;
+  }
+  function start() {
+    if (started) return;
+    started = true;
+    try {
+      if (initAudio()) {
+        actx.resume();
+        songStart = actx.currentTime + 0.15;
+        nextRow = 0;
+        audioOn = true;
+        timer = setInterval(pump, 30);
+        pump();
+      }
+    } catch (e) { audioOn = false; }
+    startBtn.hidden = true;
+  }
+  function toggleFs() {
+    try {
+      if (document.fullscreenElement) { document.exitFullscreen(); }
+      else if (stage.requestFullscreen) {
+        var p = stage.requestFullscreen();
+        if (p && p.catch) p.catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  startBtn.addEventListener('click', start);
+  sndBtn.addEventListener('click', function () { setMuted(!muted); });
+  if (document.fullscreenEnabled === false || !stage.requestFullscreen) fsBtn.hidden = true;
+  fsBtn.addEventListener('click', toggleFs);
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var k = e.key.toLowerCase();
+    if (k === 'm') setMuted(!muted);
+    else if (k === 'f' && !fsBtn.hidden) toggleFs();
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (!actx) return;
+    try { if (document.hidden) actx.suspend(); else if (started) actx.resume(); } catch (e) {}
+  });
+
+  /* ---------- boot ---------- */
+  function boot() {
+    buildSky();
+    logoCv = buildLogo();
+    scrollCv = buildScroller();
+    t0 = performance.now();
+    requestAnimationFrame(frame);
+  }
+  var fontsReady = (document.fonts && document.fonts.load) ? document.fonts.load('16px "Press Start 2P"') : Promise.resolve();
+  Promise.race([fontsReady, new Promise(function (r) { setTimeout(r, 2500); })]).then(boot, boot);
+})();
+</script>
+
+</body></html>

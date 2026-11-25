@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+
+<title>Uhr</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Uhr">
+<meta name="theme-color" content="#0a0908">
+<style>
+  :root {
+    --u: min(0.8vw, 1.7vh);            /* Grundmaß für Gehäuse, Schrift und Knöpfe */
+    --w: min(10vw, 33vh);              /* Breite einer Klapptafel */
+    --tw: min(9.6vw, 21vh);            /* Breite einer Nixie-Röhre */
+    --bg: #0a0908;
+    --card: #1b1b1b;
+    --card-dark: #121212;
+    --card-bottom: #181818;
+    --slit: #000;
+    --ink: #f1e6cf;
+    --accent: #e0662b;
+    --edge: rgba(241, 230, 207, .38);
+    /* Gehäuse: gebürstetes Aluminium (dunkle Variante) */
+    --al-a: #6d7178;
+    --al-b: #a4a8af;
+    --al-c: #868a91;
+    --al-d: #5f6369;
+    --al-hi: #c9ccd2;       /* heller Glanzstreifen */
+    --brush-op: .3;         /* Stärke der Bürstentextur */
+    --brush: rgba(255, 255, 255, .07);
+    --brush-dk: rgba(0, 0, 0, .09);
+  }
+  body.noseconds { --w: min(14vw, 37vh); --tw: min(13vw, 27vh); }
+
+  :root.light {
+    --bg: #ece6d8;
+    --card: #fbf7ee;
+    --card-dark: #e8e1d0;
+    --card-bottom: #dcd4c0;
+    --slit: #7d7768;
+    --ink: #211e19;
+    --accent: #c4501a;
+    --edge: rgba(33, 30, 25, .5);
+    /* Gehäuse: gebürstetes Aluminium (helle Variante) */
+    --al-a: #b3b7bd;
+    --al-b: #e6e8eb;
+    --al-c: #c9ccd1;
+    --al-d: #a8acb2;
+    --al-hi: #f6f7f9;
+    --brush-op: .26;
+    --brush: rgba(255, 255, 255, .12);
+    --brush-dk: rgba(0, 0, 0, .07);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    transition: filter 2s ease, background .4s ease;
+  }
+  body.night { filter: brightness(0.3); }
+
+  .stage {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* =========================== GEHÄUSE =========================== */
+  .case {
+    position: relative;
+    display: flex; flex-direction: column;
+    gap: calc(var(--u) * 1.5);
+    padding: calc(var(--u) * 2.2) calc(var(--u) * 7.6);
+    border-radius: calc(var(--u) * 2.4);
+    isolation: isolate;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 30%, rgba(0,0,0,.16)),
+      linear-gradient(98deg, var(--al-a), var(--al-b) 12%, var(--al-c) 26%, var(--al-hi) 35%, var(--al-c) 45%, var(--al-a) 58%, var(--al-b) 72%, var(--al-c) 86%, var(--al-d));
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, .55),
+      inset 1px 1px 0 rgba(255, 255, 255, .5),
+      inset -1px -1px 0 rgba(0, 0, 0, .4),
+      inset 0 -4px 8px rgba(0, 0, 0, .35),
+      inset 0 0 0 1.5px rgba(0, 0, 0, .5),
+      inset 0 0 0 calc(var(--u) * .45) rgba(255, 255, 255, .14),
+      0 calc(var(--u) * 1.4) calc(var(--u) * 3.5) rgba(0, 0, 0, .75);
+  }
+  .case::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    border-radius: inherit;
+    background-image: var(--streak), var(--grain-img);
+    background-size: 480px 480px, 200px 200px;
+    mix-blend-mode: overlay;
+    opacity: var(--brush-op);
+  }
+  .screw {
+    position: absolute;
+    width: calc(var(--u) * 1.4); height: calc(var(--u) * 1.4);
+    border-radius: 50%;
+    background:
+      linear-gradient(35deg, transparent 43%, rgba(0,0,0,.75) 43% 57%, transparent 57%),
+      radial-gradient(circle at 35% 30%, #d9dce0, #8a8e95 55%, #45484e);
+    box-shadow:
+      0 0 0 calc(var(--u) * .22) rgba(0, 0, 0, .28),
+      0 1px 1px calc(var(--u) * .22) rgba(255, 255, 255, .55);
+  }
+  .screw.tl { top: calc(var(--u) * 1.6); left: calc(var(--u) * 1.6); }
+  .screw.tr { top: calc(var(--u) * 1.6); right: calc(var(--u) * 1.6); transform: rotate(60deg); }
+  .screw.bl { bottom: calc(var(--u) * 1.6); left: calc(var(--u) * 1.6); transform: rotate(25deg); }
+  .screw.br { bottom: calc(var(--u) * 1.6); right: calc(var(--u) * 1.6); transform: rotate(100deg); }
+
+  /* Sichtfenster */
+  .window {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    padding: calc(var(--u) * 1.6);
+    border-radius: calc(var(--u) * 1.2);
+    background: #090807;
+    box-shadow:
+      inset 0 0 calc(var(--u) * 2) rgba(0, 0, 0, .95),
+      inset 0 calc(var(--u) * .4) calc(var(--u) * .8) rgba(0, 0, 0, .9),
+      inset 0 calc(var(--u) * .25) calc(var(--u) * .5) rgba(0, 0, 0, .6),
+      0 1px 0 rgba(255, 255, 255, .22),
+      0 -1px 0 rgba(0, 0, 0, .6);
+  }
+  .window::after {   /* Glasreflexion */
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 30;
+    border-radius: inherit;
+    background:
+      linear-gradient(115deg,
+        transparent 33%,
+        rgba(255,255,255,.03) 35%,
+        rgba(255,255,255,.16) 37%,
+        rgba(255,255,255,.26) 39%,
+        rgba(255,255,255,.16) 41%,
+        rgba(255,255,255,.03) 43%,
+        transparent 45%),
+      linear-gradient(115deg,
+        transparent 55%,
+        rgba(255,255,255,.03) 57%,
+        rgba(255,255,255,.07) 58.5%,
+        rgba(255,255,255,.03) 60%,
+        transparent 62%),
+      linear-gradient(180deg,
+        rgba(255,255,255,.06) 0%,
+        rgba(255,255,255,.02) 10%,
+        transparent 20%);
+  }
+  :root.light .window::after {
+    background:
+      linear-gradient(115deg,
+        transparent 33%,
+        rgba(255,255,255,.18) 37%,
+        rgba(255,255,255,.32) 39%,
+        rgba(255,255,255,.18) 41%,
+        transparent 45%),
+      linear-gradient(180deg,
+        rgba(255,255,255,.10) 0%,
+        transparent 18%);
+  }
+
+  /* ---- Uhr-Zeile (alle Watchfaces) ---- */
+  .clock {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  body:not(.face-flip)  .clock.flip   { display: none; }
+  body:not(.face-nixie) .clock.nixie  { display: none; }
+  body:not(.face-lcd)   .clock.lcd    { display: none; }
+  body:not(.face-analog) .clock.analog { display: none; }
+  body.noseconds .clock .seconds-group, body.noseconds .clock .colon.second { display: none !important; }
+
+  .clock.flip  { gap: calc(var(--w) * 0.16); }
+  .clock.nixie { gap: calc(var(--tw) * 0.14); }
+  .clock.flip  .group { display: flex; gap: calc(var(--w) * 0.07); }
+  .clock.nixie .group { display: flex; gap: calc(var(--tw) * 0.08); }
+
+  /* ---- Druckknöpfe in der linken Gehäuseblende ---- */
+  .ctrl {
+    position: absolute;
+    right: calc(100% + var(--u) * 1.3);
+    top: calc(var(--u) * 1.6);
+    display: flex; flex-direction: column; gap: calc(var(--u) * 1.1);
+    z-index: 40;
+  }
+  .cbtn {
+    width: calc(var(--u) * 5); height: calc(var(--u) * 5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: calc(var(--u) * 2.7); line-height: 1;
+    font-family: inherit;
+    color: #e8eaed;
+    background: linear-gradient(180deg, #5a5e65, #383b40 55%, #2a2c30);
+    border: 1px solid #0f1012;
+    border-radius: calc(var(--u) * 1.2);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .35),
+      inset 0 -2px 3px rgba(0, 0, 0, .35),
+      0 calc(var(--u) * .35) 0 #101113,
+      0 calc(var(--u) * .6) calc(var(--u) * .8) rgba(0, 0, 0, .55);
+    cursor: pointer;
+  }
+  .cbtn:active {
+    transform: translateY(calc(var(--u) * .3));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .25),
+      inset 0 -1px 2px rgba(0, 0, 0, .4),
+      0 calc(var(--u) * .08) 0 #101113;
+  }
+  .cbtn svg { width: calc(var(--u) * 2.9); height: calc(var(--u) * 2.9); display: block; }
+  .cbtn { position: relative; }
+
+  .ctrl.right { right: auto; left: calc(100% + var(--u) * 1.3); }
+  .cbtn.on {
+    transform: translateY(calc(var(--u) * .3));
+    background: linear-gradient(180deg, #34373c, #2a2c30 55%, #222427);
+    box-shadow:
+      inset 0 2px 4px rgba(0, 0, 0, .55),
+      0 calc(var(--u) * .08) 0 #101113;
+  }
+  .cbtn.on::after {
+    content: ""; position: absolute;
+    top: calc(var(--u) * .5); right: calc(var(--u) * .5);
+    width: calc(var(--u) * .7); height: calc(var(--u) * .7);
+    border-radius: 50%;
+    background: #ffa23c;
+    box-shadow: 0 0 5px 2px rgba(255, 140, 30, .85);
+  }
+
+  /* =========================== KLAPPTAFELN =========================== */
+  .clock.flip .colon { display: flex; flex-direction: column; gap: calc(var(--w) * 0.18); }
+  .clock.flip .colon i {
+    display: block; width: calc(var(--w) * 0.1); height: calc(var(--w) * 0.1);
+    background: #e9dcc0; border-radius: 50%; opacity: .85;
+  }
+
+  .card {
+    position: relative;
+    width: var(--w);
+    height: calc(var(--w) * 1.4);
+    perspective: calc(var(--w) * 6);
+    font-size: calc(var(--w) * 1.12);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .half {
+    position: absolute; left: 0; width: 100%; height: 50%;
+    overflow: hidden;
+    background: linear-gradient(var(--card), var(--card-dark));
+    box-shadow: inset 0 0 0 max(1.5px, calc(var(--w) * 0.012)) var(--edge);
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  }
+  .half span {
+    position: absolute; left: 0; width: 100%; height: 200%;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .top, .flip-top {
+    top: 0; transform-origin: bottom;
+    border-radius: calc(var(--w) * 0.08) calc(var(--w) * 0.08) 0 0;
+    border-bottom: 1px solid var(--slit);
+  }
+  .top span, .flip-top span { top: 0; }
+  .bottom, .flip-bottom {
+    bottom: 0; transform-origin: top;
+    background: linear-gradient(var(--card-dark), var(--card-bottom));
+    border-radius: 0 0 calc(var(--w) * 0.08) calc(var(--w) * 0.08);
+  }
+  .bottom span, .flip-bottom span { bottom: 0; }
+
+  .flip-top, .flip-bottom { visibility: hidden; }
+  .card.flipping .flip-top {
+    visibility: visible;
+    animation: flipTop .3s ease-in forwards;
+  }
+  .card.flipping .flip-bottom {
+    visibility: visible;
+    transform: rotateX(90deg);
+    animation: flipBottom .3s ease-out .3s forwards;
+  }
+  @keyframes flipTop    { from { transform: rotateX(0); }     to { transform: rotateX(-90deg); } }
+  @keyframes flipBottom { from { transform: rotateX(90deg); } to { transform: rotateX(0); } }
+
+  .card::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    height: calc(var(--w) * 0.025); transform: translateY(-50%);
+    background: var(--slit); z-index: 5;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; z-index: 4; pointer-events: none;
+    border-radius: calc(var(--w) * 0.08);
+    box-shadow: 0 calc(var(--w) * 0.04) calc(var(--w) * 0.12) rgba(0,0,0,.7);
+  }
+
+  /* =========================== NIXIE-RÖHREN =========================== */
+  .clock.nixie .colon {
+    display: flex; flex-direction: column; gap: calc(var(--tw) * 0.34);
+    padding-bottom: calc(var(--tw) * 0.2);
+  }
+  .clock.nixie .colon i {
+    display: block;
+    width: calc(var(--tw) * 0.12); height: calc(var(--tw) * 0.12);
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #ffe2b8, #ff8a2a 60%, #c4501a);
+    box-shadow: 0 0 calc(var(--tw) * 0.1) calc(var(--tw) * 0.03) rgba(255, 120, 30, .75),
+                0 0 calc(var(--tw) * 0.3) rgba(255, 100, 20, .45);
+    transition: opacity .35s ease;
+  }
+  .clock.nixie .colon i.off { opacity: .25; }
+
+  .tube {
+    position: relative;
+    width: var(--tw);
+    height: calc(var(--tw) * 1.78);
+  }
+  .glass {
+    position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--tw) * 0.2);
+    border-radius: calc(var(--tw) * 0.5) calc(var(--tw) * 0.5) calc(var(--tw) * 0.1) calc(var(--tw) * 0.1);
+    background: radial-gradient(ellipse at 50% 50%, #1b0d06 0%, #0a0504 70%, #050302 100%);
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 calc(var(--tw) * 0.16) rgba(255, 120, 40, .2),
+      inset 0 0 0 1.5px rgba(255, 255, 255, .13),
+      0 0 calc(var(--tw) * 0.3) rgba(255, 100, 20, .22);
+  }
+  .glass::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 48%, rgba(255, 130, 40, .34), transparent 64%);
+  }
+  .mesh {
+    position: absolute; inset: 0; opacity: .9;
+    background-image:
+      repeating-linear-gradient(60deg,  transparent 0 4px, rgba(255, 170, 90, .075) 4px 5px),
+      repeating-linear-gradient(-60deg, transparent 0 4px, rgba(255, 170, 90, .075) 4px 5px),
+      repeating-linear-gradient(0deg,   transparent 0 4px, rgba(255, 170, 90, .05) 4px 5px);
+  }
+  .wires { position: absolute; left: 12%; right: 12%; top: 10%; bottom: 8%; }
+  .wires svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+  .dim path {
+    fill: none; stroke: rgba(175, 115, 75, .32); stroke-width: 1.3;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .dg { opacity: 0; transition: opacity .1s linear; }
+  .dg.on { opacity: 1; }
+  .dg .out  { fill: none; stroke: #ff8a2a; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  .dg .core { fill: none; stroke: #ffe6bf; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+
+  .shine {
+    position: absolute; left: 8%; top: 6%; width: 17%; height: 62%;
+    border-radius: 50%;
+    background: linear-gradient(to bottom, rgba(255,255,255,.24), rgba(255,255,255,0));
+    filter: blur(1px);
+  }
+  .base {
+    position: absolute; left: 10%; right: 10%; bottom: 0;
+    height: calc(var(--tw) * 0.25);
+    background: linear-gradient(90deg, #151515, #7a7a7a 28%, #2c2c2c 58%, #101010);
+    border-radius: 0 0 calc(var(--tw) * 0.08) calc(var(--tw) * 0.08);
+    box-shadow: 0 calc(var(--tw) * 0.04) calc(var(--tw) * 0.1) rgba(0,0,0,.7);
+  }
+  .base::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0;
+    height: calc(var(--tw) * 0.04);
+    background: linear-gradient(90deg, #6b3d17, #d89a52 40%, #8a5420);
+  }
+
+
+  /* =========================== LCD (Casio-Stil) =========================== */
+  .clock.lcd {
+    --lcd-bg1: #a6e6cf; --lcd-bg2: #5fae96;
+    --on: #0b1d17; --off: rgba(8, 40, 30, .075);
+    --lcd-ink: #0b1d17; --lcd-ghost: rgba(8, 40, 30, .2);
+    --lcd-glow: rgba(150, 255, 215, .35);
+    --lcd-shadow: rgba(0, 25, 15, .26);
+  }
+  :root.light .clock.lcd {
+    --lcd-bg1: #cfd6b6; --lcd-bg2: #a8b28d;
+    --on: #1b2016; --off: rgba(30, 38, 20, .07);
+    --lcd-ink: #1b2016; --lcd-ghost: rgba(30, 38, 20, .2);
+    --lcd-glow: rgba(255, 255, 255, 0);
+    --lcd-shadow: rgba(40, 45, 25, .28);
+  }
+  .lcd-panel {
+    position: relative; overflow: hidden;
+    width: calc(var(--u) * 89.6);
+    height: calc(var(--u) * 25.2);
+    padding: calc(var(--u) * 1.6) calc(var(--u) * 2.8) calc(var(--u) * 1.8);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto 1fr;
+    column-gap: calc(var(--u) * 1.6);
+    row-gap: calc(var(--u) * .8);
+    border-radius: calc(var(--u) * 1);
+    background: radial-gradient(ellipse at 50% 45%, var(--lcd-bg1), var(--lcd-bg2) 95%);
+    box-shadow:
+      inset 0 0 calc(var(--u) * 3) var(--lcd-glow),
+      inset 0 0 calc(var(--u) * 1.2) rgba(0, 0, 0, .5),
+      inset 0 calc(var(--u) * .25) calc(var(--u) * .5) rgba(0, 0, 0, .55);
+    color: var(--lcd-ink);
+  }
+  .lcd-panel::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 5;
+    background:
+      linear-gradient(115deg, rgba(255,255,255,.26), rgba(255,255,255,0) 34%),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.035) 0 1px, transparent 1px 3px);
+  }
+  .lcd-days {
+    grid-column: 1 / -1;
+    display: flex; justify-content: space-between;
+    padding: 0 calc(var(--u) * 1);
+    font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Courier New", monospace;
+    font-weight: 800;
+    font-size: calc(var(--u) * 2.4);
+    letter-spacing: .08em;
+    transform: skewX(-8deg);
+  }
+  .lcd-days span { position: relative; color: var(--lcd-ghost); padding-bottom: calc(var(--u) * .6); }
+  .lcd-days span.on { color: var(--lcd-ink); text-shadow: calc(var(--u) * .12) calc(var(--u) * .12) 0 var(--lcd-shadow); }
+  .lcd-days span.on::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+    height: calc(var(--u) * .4); background: var(--lcd-ink);
+  }
+
+  .lcd-left, .lcd-right { display: flex; flex-direction: column; min-width: 0; }
+  .lcd-left  { align-items: flex-start; justify-content: flex-end; gap: calc(var(--u) * .9); }
+  .lcd-right { align-items: flex-end;   justify-content: space-between; }
+  .lcd-main { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 1.3); transform: skewX(-8deg); }
+  .lcd-row  { display: flex; align-items: flex-end; gap: calc(var(--u) * .5); transform: skewX(-8deg); }
+  .lcd-colon { display: flex; flex-direction: column; gap: calc(var(--u) * 3.8); margin: 0 calc(var(--u) * .3); }
+  .lcd-colon i {
+    display: block; width: calc(var(--u) * 1.8); height: calc(var(--u) * 1.8);
+    background: var(--on); box-shadow: calc(var(--u) * .14) calc(var(--u) * .14) 0 var(--lcd-shadow);
+    transition: opacity .12s linear;
+  }
+  .lcd-colon.off i { opacity: .09; }
+
+  .clock.lcd .s7 { filter: drop-shadow(calc(var(--u) * .16) calc(var(--u) * .16) 0 var(--lcd-shadow)); }
+  .lcd-main .s7  { height: calc(var(--u) * 15);  width: calc(var(--u) * 9); }
+  .lcd-sec .s7   { height: calc(var(--u) * 8.4); width: calc(var(--u) * 5.04); }
+  .lcd-row .s7   { height: calc(var(--u) * 7.2); width: calc(var(--u) * 4.3); }
+  .clock.lcd .dot {
+    display: block; align-self: flex-end; background: var(--on); box-shadow: none;
+    width: calc(var(--u) * 1); height: calc(var(--u) * 1); border-radius: 0;
+    margin: 0 calc(var(--u) * .35) calc(var(--u) * .25);
+  }
+  .lcd-sec { display: flex; gap: calc(var(--u) * .5); transform: skewX(-8deg); }
+  .lcd-small {
+    font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Courier New", monospace;
+    font-weight: 800; font-size: calc(var(--u) * 2.2); letter-spacing: .08em;
+    transform: skewX(-8deg); white-space: pre;
+  }
+  .lcd-small.dim { color: var(--lcd-ghost); }
+
+  /* =========================== ANALOG (Stahlgehäuse, Sunburst) =========================== */
+  .clock.analog { width: calc(var(--u) * 89.6); }   /* Zifferblatt über die volle Fensterbreite */
+  .clock.analog svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .clock.analog .a-num {
+    fill: #efe6cf;
+    font-family: Didot, "Bodoni 72", "Playfair Display", Georgia, "Times New Roman", serif;
+    font-weight: 500; font-size: 11.5px;
+    text-anchor: middle; dominant-baseline: central;
+  }
+  .clock.analog .a-brand {
+    fill: #d9dde4; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 700; font-size: 4.2px; letter-spacing: 1.4px; text-anchor: middle;
+  }
+  .clock.analog .a-sub {
+    fill: #8f96a1; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 600; font-size: 2.7px; letter-spacing: 1.2px; text-anchor: middle;
+  }
+
+  /* =========================== VFD-Anzeigen (Wetter oben, Datum unten) =========================== */
+  .vfd {
+    --on: #a9ffe7;  --off: rgba(110, 255, 220, .07);
+    --dim: rgba(110, 255, 220, .16);  --lit: #b4ffe9;
+    --g1: rgba(90, 255, 215, .9);  --g2: rgba(60, 230, 190, .5);
+    --bgc1: #08171c;  --bgc2: #03090b;
+
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: calc(var(--u) * 2);
+    padding: calc(var(--u) * .9) calc(var(--u) * 2.4);
+    width: 0; min-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    border-radius: calc(var(--u) * .8);
+    background: radial-gradient(ellipse at 50% 50%, var(--bgc1), var(--bgc2) 78%);
+    box-shadow:
+      inset 0 0 calc(var(--u) * 1.4) rgba(0, 0, 0, .95),
+      inset 0 1px 3px rgba(0, 0, 0, .9),
+      0 1px 0 rgba(255, 255, 255, .25);
+  }
+  .vfd.warm {
+    --on: #ffa23c;  --off: rgba(255, 150, 50, .08);
+    --dim: rgba(255, 150, 50, .18);  --lit: #ffb560;
+    --g1: rgba(255, 140, 30, .9);  --g2: rgba(255, 100, 20, .5);
+    --bgc1: #1a0e06;  --bgc2: #070403;
+  }
+  .vfd::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.2) 0 1px, transparent 1px 3px);
+  }
+
+  .vfd-days {
+    display: flex; gap: calc(var(--u) * .9);
+    font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Courier New", monospace;
+    font-weight: 700;
+    font-size: calc(var(--u) * 1.8);
+    letter-spacing: .06em;
+  }
+  .dy { color: var(--dim); }
+  .dy.on {
+    color: var(--lit);
+    text-shadow: 0 0 5px var(--g1), 0 0 12px var(--g2);
+  }
+
+  .vfd-date, .vfd-kw { display: flex; align-items: center; gap: calc(var(--u) * .55); }
+  .vfd-kw .dy { margin-right: calc(var(--u) * .4); }
+  .vfd-txt { display: flex; align-items: center; gap: calc(var(--u) * .45); }
+  .vfd .mon { display: flex; align-items: center; gap: calc(var(--u) * .55); margin: 0 calc(var(--u) * .5); }
+  .vfd > *, .vfd-date > *, .vfd-kw > *, .vfd-txt > *, .vfd .mon > *, .vfd-days > * { flex-shrink: 0; }
+
+  .s7 {
+    display: block; overflow: visible;
+    height: calc(var(--u) * 4); width: calc(var(--u) * 2.4);
+    filter: drop-shadow(0 0 2px var(--g1)) drop-shadow(0 0 6px var(--g2));
+  }
+  .s7.sm { height: calc(var(--u) * 2.8); width: calc(var(--u) * 1.68); }
+  .vfd .mon .s7.sm { height: calc(var(--u) * 4); width: calc(var(--u) * 2.4); }
+
+  .vfd-days, .vfd-date, .vfd-kw, .vfd-txt { transform: skewX(-9deg); }
+
+  .vfd .fl { opacity: .7; }
+  .vfd.dip { opacity: .88; }
+  .s7 polygon { fill: var(--off); }
+  .s7 polygon.on { fill: var(--on); }
+  .vfd .dot {
+    display: block; align-self: flex-end;
+    width: calc(var(--u) * .5); height: calc(var(--u) * .5);
+    margin: 0 calc(var(--u) * .2) calc(var(--u) * .3);
+    border-radius: 50%;
+    background: var(--on);
+    box-shadow: 0 0 4px var(--g1), 0 0 9px var(--g2);
+  }
+  .vfd .deg {
+    display: block; align-self: flex-start;
+    width: calc(var(--u) * 1.1); height: calc(var(--u) * 1.1);
+    margin: calc(var(--u) * .2) calc(var(--u) * .1) 0;
+    border-radius: 50%;
+    border: calc(var(--u) * .3) solid var(--on);
+    box-shadow: 0 0 4px var(--g1), inset 0 0 3px var(--g1);
+  }
+
+  .vfd .wslot, .vfd .wtemp, .vfd .wdesc {
+    transition: transform .9s cubic-bezier(.22, .61, .36, 1), opacity .9s ease;
+    will-change: transform, opacity;
+  }
+  .vfd .wout { transform: translateX(-110%); opacity: 0; }
+  .vfd .win  { transform: translateX(110%);  opacity: 0; transition: none; }
+
+  /* =========================== RÄUMLICHE TIEFE =========================== */
+  .card .top, .card .flip-top {
+    box-shadow:
+      inset 0 0 0 max(1.5px, calc(var(--w) * 0.012)) var(--edge),
+      inset 0 calc(var(--w) * 0.05) calc(var(--w) * 0.09) rgba(0,0,0,.55),
+      inset 0 calc(var(--w) * 0.01) calc(var(--w) * 0.02) rgba(0,0,0,.30);
+  }
+  .card .bottom, .card .flip-bottom {
+    box-shadow:
+      inset 0 0 0 max(1.5px, calc(var(--w) * 0.012)) var(--edge),
+      inset 0 calc(var(--w) * -0.05) calc(var(--w) * 0.09) rgba(0,0,0,.55),
+      inset 0 calc(var(--w) * -0.01) calc(var(--w) * 0.02) rgba(0,0,0,.30);
+  }
+  .card::after {
+    box-shadow:
+      0 calc(var(--w) * -0.012) calc(var(--w) * 0.035) rgba(255,190,120,.12),
+      0 calc(var(--w) *  0.012) calc(var(--w) * 0.050) rgba(0,0,0,.65);
+  }
+
+  .glass::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    border-radius: inherit;
+    background:
+      linear-gradient(90deg,
+        rgba(0,0,0,.55) 0%,
+        rgba(0,0,0,.10) 6%,
+        transparent 22%,
+        transparent 78%,
+        rgba(0,0,0,.10) 94%,
+        rgba(0,0,0,.55) 100%),
+      linear-gradient(90deg,
+        transparent 78%,
+        rgba(255,220,180,.10) 86%,
+        rgba(255,220,180,.04) 91%,
+        transparent 96%);
+  }
+
+  /* =========================== BURN-IN-SCHUTZ =========================== */
+  body.saver .clock .seconds-group,
+  body.saver .clock .colon.second,
+  body.saver #weather { display: none !important; }
+  body.saver { filter: brightness(0.55); }
+  body.night.saver { filter: brightness(0.15); }
+
+  .case { transition: transform 1.5s ease; }
+
+  .window::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    border-radius: inherit;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 62% 48% at 50% 46%, rgba(255,220,180,.055) 0%, transparent 72%),
+      linear-gradient(180deg, transparent 62%, rgba(0,0,0,.18) 100%);
+  }
+
+  body.face-nixie .window::before {
+    background:
+      radial-gradient(ellipse 70% 52% at 50% 50%, rgba(255,140,40,.075) 0%, transparent 76%),
+      linear-gradient(180deg, transparent 62%, rgba(0,0,0,.18) 100%);
+  }
+
+  /* =========================== MARKENPLAKETTE =========================== */
+  .case::after {
+    content: "* stefan-wehner.de * Nixie Tube & Flipcard & LCD & Analog Clock V2.2 *";
+    position: absolute;
+    bottom: calc(var(--u) * 0.8 - 2mm);
+    left: calc(var(--u) * 7.6);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: calc(var(--u) * 1.15);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: lowercase;
+    color: rgba(255, 255, 255, 0.62);
+    text-shadow:
+      0 1px 0 rgba(0, 0, 0, 0.6),
+      0 -1px 0 rgba(255, 255, 255, 0.22);
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  :root.light .case::after {
+    color: rgba(0, 0, 0, 0.52);
+    text-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.55),
+      0 -1px 0 rgba(0, 0, 0, 0.18);
+  }
+
+  /* =========================== LCD-MODUS: untere VFD-Zeile entfällt =========================== */
+  body.face-lcd #date { display: none; }
+</style>
+</head>
+<body class="face-flip">
+<!-- Filter für die Nixie-Ziffern + Verläufe und Filter fürs analoge Zifferblatt -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="-20" y="-20" width="80" height="104">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="wide"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.9" result="tight"/>
+      <feMerge>
+        <feMergeNode in="wide"/>
+        <feMergeNode in="wide"/>
+        <feMergeNode in="tight"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Analog: Gehäusering aus poliertem Stahl -->
+    <linearGradient id="aChrome" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#f6f8fa"/>
+      <stop offset=".16" stop-color="#a3a9b1"/>
+      <stop offset=".40" stop-color="#3c4046"/>
+      <stop offset=".52" stop-color="#1b1d21"/>
+      <stop offset=".62" stop-color="#555a62"/>
+      <stop offset=".84" stop-color="#cfd4da"/>
+      <stop offset="1"   stop-color="#82878e"/>
+    </linearGradient>
+    <linearGradient id="aChrome2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"   stop-color="#1c1e23"/>
+      <stop offset=".35" stop-color="#8d929a"/>
+      <stop offset=".55" stop-color="#2a2d33"/>
+      <stop offset="1"   stop-color="#c3c8ce"/>
+    </linearGradient>
+    <linearGradient id="aBezelIn" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0"   stop-color="#f1f3f5"/>
+      <stop offset=".3"  stop-color="#8a8f97"/>
+      <stop offset=".6"  stop-color="#24272b"/>
+      <stop offset="1"   stop-color="#6f747c"/>
+    </linearGradient>
+    <radialGradient id="aDialBase" cx="50%" cy="40%" r="72%">
+      <stop offset="0"   stop-color="#2b3548"/>
+      <stop offset=".55" stop-color="#141a26"/>
+      <stop offset="1"   stop-color="#05070b"/>
+    </radialGradient>
+    <clipPath id="aDialClip"><ellipse cx="100" cy="50" rx="91" ry="40.5"/></clipPath>
+
+    <!-- Zeiger: zweigeteilte (facettierte) Dauphine-Form -->
+    <linearGradient id="aSteelL" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f7f8fa"/><stop offset="1" stop-color="#c3c8cf"/>
+    </linearGradient>
+    <linearGradient id="aSteelR" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9aa0a8"/><stop offset="1" stop-color="#5a5f67"/>
+    </linearGradient>
+    <radialGradient id="aCap" cx="38%" cy="32%" r="75%">
+      <stop offset="0"  stop-color="#ffffff"/>
+      <stop offset=".5" stop-color="#9aa0a8"/>
+      <stop offset="1"  stop-color="#34383e"/>
+    </radialGradient>
+    <filter id="aHandShadow" filterUnits="userSpaceOnUse" x="0" y="0" width="200" height="100">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.9" result="b"/>
+      <feOffset in="b" dx="0.8" dy="1.7" result="o"/>
+      <feComponentTransfer in="o" result="sh"><feFuncA type="linear" slope=".6"/></feComponentTransfer>
+      <feMerge><feMergeNode in="sh"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="aLumeGlow" filterUnits="userSpaceOnUse" x="0" y="0" width="200" height="100">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.9" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="aSoft" filterUnits="userSpaceOnUse" x="0" y="0" width="200" height="100">
+      <feGaussianBlur stdDeviation="1.8"/>
+    </filter>
+
+    <!-- Glasreflexion -->
+    <linearGradient id="aGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".20"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="aStreak" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"  stop-color="#fff" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#fff" stop-opacity=".10"/>
+      <stop offset="1"  stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="stage">
+  <div class="case">
+    <i class="screw tl"></i><i class="screw tr"></i><i class="screw bl"></i><i class="screw br"></i>
+
+    <!-- Wetter-Anzeige -->
+    <div class="vfd warm" id="weather"></div>
+
+    <!-- Sichtfenster mit den vier Watchfaces -->
+    <div class="window">
+      <div class="ctrl">
+        <button class="cbtn" data-act="theme" aria-label="Hell/Dunkel umschalten">☀︎</button>
+        <button class="cbtn" data-act="face" aria-label="Watchface wechseln"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.5"></rect><path d="M4 12h16"></path></svg></button>
+      </div>
+      <div class="ctrl right">
+        <button class="cbtn on" data-act="sec" aria-label="Sekunden an/aus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.5" r="7"></circle><path d="M10 3h4"></path><path d="M12 13.5V9.5"></path><path d="M18 7l1.5-1.5"></path></svg></button>
+      </div>
+
+      <!-- Watchface 1: Klapptafeln -->
+      <div class="clock flip" id="flipClock">
+        <div class="group" data-unit="h"></div>
+        <div class="colon"><i></i><i></i></div>
+        <div class="group" data-unit="m"></div>
+        <div class="colon second"><i></i><i></i></div>
+        <div class="group seconds-group" data-unit="s"></div>
+      </div>
+
+      <!-- Watchface 2: Nixie-Röhren -->
+      <div class="clock nixie" id="nixieClock">
+        <div class="group" data-unit="h"></div>
+        <div class="colon"><i></i><i></i></div>
+        <div class="group" data-unit="m"></div>
+        <div class="colon second"><i></i><i></i></div>
+        <div class="group seconds-group" data-unit="s"></div>
+      </div>
+
+      <!-- Watchface 3: LCD im Casio-Stil -->
+      <div class="clock lcd" id="lcdClock">
+        <div class="lcd-panel">
+          <div class="lcd-days" id="lcdDays"><span>MO</span><span>DI</span><span>MI</span><span>DO</span><span>FR</span><span class="on">SA</span><span>SO</span></div>
+          <div class="lcd-left">
+            <div class="lcd-row" id="lcdDate"></div>
+            <div class="lcd-small" id="lcdInfo">2026  KW 44</div>
+          </div>
+          <div class="lcd-main" id="lcdMain"></div>
+          <div class="lcd-right">
+            <div class="lcd-small dim">24H</div>
+            <div class="lcd-sec seconds-group" id="lcdSec"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Watchface 4: Analog – poliertes Stahlgehäuse, Sunburst-Zifferblatt, Dauphine-Zeiger -->
+      <div class="clock analog" id="analogClock">
+        <svg viewBox="0 0 200 100" role="img" aria-label="Analoguhr">
+          <!-- Gehäuse -->
+          <ellipse cx="100" cy="50" rx="99"   ry="48"   fill="url(#aChrome)"/>
+          <ellipse cx="100" cy="50" rx="97.2" ry="46.2" fill="url(#aChrome2)"/>
+          <ellipse cx="100" cy="50" rx="95.6" ry="44.6" fill="#07080a"/>
+          <ellipse cx="100" cy="50" rx="94.4" ry="43.4" fill="url(#aBezelIn)"/>
+          <ellipse cx="100" cy="50" rx="92.2" ry="41.2" fill="#050607"/>
+          <!-- Zifferblatt -->
+          <ellipse cx="100" cy="50" rx="91" ry="40.5" fill="url(#aDialBase)"/>
+          <g clip-path="url(#aDialClip)">
+            <g id="aSun"></g>
+            <ellipse cx="100" cy="50" rx="91" ry="40.5" fill="none" stroke="#000" stroke-opacity=".5" stroke-width="4"/>
+          </g>
+          <ellipse cx="100" cy="50" rx="91" ry="40.5" fill="none" stroke="#fff" stroke-opacity=".13" stroke-width=".4"/>
+          <g id="aMarks"></g>
+          <!-- Zeiger -->
+          <g id="aHands" filter="url(#aHandShadow)">
+            <g id="aHour">
+              <polygon points="0,-25 -3.4,-7 -1.5,8 0,8" fill="url(#aSteelL)" stroke="#000" stroke-opacity=".4" stroke-width=".3"/>
+              <polygon points="0,-25 3.4,-7 1.5,8 0,8"   fill="url(#aSteelR)" stroke="#000" stroke-opacity=".4" stroke-width=".3"/>
+              <polygon points="0,-21 -1.6,-8 0,-2.5 1.6,-8" fill="#d4f3d6"/>
+            </g>
+            <g id="aMin">
+              <polygon points="0,-35 -2.9,-10 -1.4,9 0,9" fill="url(#aSteelL)" stroke="#000" stroke-opacity=".4" stroke-width=".3"/>
+              <polygon points="0,-35 2.9,-10 1.4,9 0,9"   fill="url(#aSteelR)" stroke="#000" stroke-opacity=".4" stroke-width=".3"/>
+              <polygon points="0,-31 -1.3,-11 0,-4 1.3,-11" fill="#d4f3d6"/>
+            </g>
+            <g id="aSec" class="seconds-group">
+              <line x1="0" y1="14" x2="0" y2="-37" stroke="#e23a2e" stroke-width="1"/>
+              <rect x="-1.6" y="5" width="3.2" height="10" rx=".7" fill="#e23a2e"/>
+              <circle cx="0" cy="-27" r="2.6" fill="#e23a2e"/>
+              <circle cx="0" cy="-27" r="1.2" fill="#f4dccb"/>
+            </g>
+          </g>
+          <!-- Zeigerachse -->
+          <circle cx="100" cy="50" r="5.2" fill="url(#aCap)"/>
+          <circle cx="100" cy="50" r="2.6" fill="#17191d"/>
+          <circle class="seconds-group" cx="100" cy="50" r="1.7" fill="#e23a2e"/>
+          <!-- Glas -->
+          <g clip-path="url(#aDialClip)" pointer-events="none">
+            <ellipse cx="100" cy="17" rx="86" ry="22" fill="url(#aGloss)"/>
+            <polygon points="64,0 88,0 56,100 32,100" fill="url(#aStreak)"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Datum als Siebensegment-VFD -->
+    <div class="vfd" id="date"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var body = document.body;
+
+  // Texturen für das Aluminium als SVG-Rauschen (werden hier zusammengesetzt, damit nichts nachgeladen werden muss)
+  (function () {
+    var filt = function (id, freq, oct, seed, slope, icpt) {
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480">' +
+        '<filter id="' + id + '" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">' +
+        '<feTurbulence type="fractalNoise" baseFrequency="' + freq + '" numOctaves="' + oct + '" seed="' + seed + '" stitchTiles="stitch"/>' +
+        '<feColorMatrix values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1"/>' +
+        '<feComponentTransfer>' +
+        '<feFuncR type="linear" slope="' + slope + '" intercept="' + icpt + '"/>' +
+        '<feFuncG type="linear" slope="' + slope + '" intercept="' + icpt + '"/>' +
+        '<feFuncB type="linear" slope="' + slope + '" intercept="' + icpt + '"/>' +
+        '</feComponentTransfer></filter>' +
+        '<rect width="100%" height="100%" filter="url(#' + id + ')"/></svg>';
+    };
+    var uri = function (svg) { return 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")'; };
+    var root = document.documentElement.style;
+    root.setProperty('--streak', uri(filt('s', '0.0018 0.85', 3, 7, 2.0, -0.5)));
+    root.setProperty('--grain-img', uri(filt('g', '0.9', 2, 3, 1.6, -0.3)));
+  })();
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+
+  /* ======================= Klapptafeln ======================= */
+  function makeCard(parent) {
+    var c = document.createElement('div');
+    c.className = 'card';
+    c.innerHTML =
+      '<div class="half top"><span>0</span></div>' +
+      '<div class="half bottom"><span>0</span></div>' +
+      '<div class="half flip-top"><span>0</span></div>' +
+      '<div class="half flip-bottom"><span>0</span></div>';
+    c.dataset.v = '0';
+    parent.appendChild(c);
+    var q = function (s) { return c.querySelector(s + ' span'); };
+    var obj = { el: c, top: q('.top'), bottom: q('.bottom'), ft: q('.flip-top'), fb: q('.flip-bottom') };
+    c.querySelector('.flip-bottom').addEventListener('animationend', function () {
+      obj.bottom.textContent = c.dataset.v;
+      c.classList.remove('flipping');
+    });
+    return obj;
+  }
+  function setInstant(card, v) {
+    card.el.classList.remove('flipping');
+    card.el.dataset.v = v;
+    card.top.textContent = card.bottom.textContent = card.ft.textContent = card.fb.textContent = v;
+  }
+  function flipTo(card, v) {
+    if (card.el.dataset.v === v) return;
+    var old = card.el.dataset.v;
+    card.el.dataset.v = v;
+    card.top.textContent = v;
+    card.ft.textContent = old;
+    card.fb.textContent = v;
+    card.el.classList.remove('flipping');
+    void card.el.offsetWidth;
+    card.el.classList.add('flipping');
+  }
+  var flipGroups = {};
+  document.querySelectorAll('#flipClock .group').forEach(function (g) {
+    flipGroups[g.dataset.unit] = [makeCard(g), makeCard(g)];
+  });
+
+  /* ======================= Nixie-Röhren ======================= */
+  var SIX = 'M31 8 C27 5 23 4 20 4 C11 4 6 16 6 38 C6 54 12 60 20 60 C29 60 34 54 34 45 C34 36 28 30 20 30 C14 30 9 34 7 40';
+  var DIGITS = [
+    { d: 'M20 4 C8 4 6 16 6 32 C6 48 8 60 20 60 C32 60 34 48 34 32 C34 16 32 4 20 4 Z' },
+    { d: 'M9 17 L22 5 L22 60' },
+    { d: 'M7 18 C7 8 14 4 21 4 C29 4 33 10 33 18 C33 27 22 38 8 58 L34 58' },
+    { d: 'M7 10 C12 5 17 4 21 4 C29 4 32 10 32 17 C32 25 26 30 16 31 C27 32 34 38 34 46 C34 55 28 60 20 60 C13 60 8 57 6 52' },
+    { d: 'M28 60 L28 4 L5 42 L36 42' },
+    { d: 'M32 5 L10 5 L8 30 C12 27 16 26 21 26 C29 26 34 32 34 43 C34 54 28 60 20 60 C13 60 8 57 6 52' },
+    { d: SIX },
+    { d: 'M6 5 L34 5 L15 60' },
+    { d: 'M20 4 C12 4 8 9 8 16 C8 23 13 28 20 31 C27 28 32 23 32 16 C32 9 28 4 20 4 Z M20 31 C11 34 6 40 6 47 C6 55 12 60 20 60 C28 60 34 55 34 47 C34 40 29 34 20 31 Z' },
+    { d: SIX, t: 'rotate(180 20 32)' }
+  ];
+  function tubeHTML() {
+    var dim = '', act = '';
+    DIGITS.forEach(function (g) {
+      var t = g.t ? ' transform="' + g.t + '"' : '';
+      dim += '<path d="' + g.d + '"' + t + '/>';
+      act += '<g class="dg"><path class="out" d="' + g.d + '"' + t + '/>' +
+             '<path class="core" d="' + g.d + '"' + t + '/></g>';
+    });
+    return '<div class="glass"><div class="mesh"></div><div class="wires">' +
+           '<svg viewBox="0 0 40 64" preserveAspectRatio="xMidYMid meet">' +
+           '<g class="dim">' + dim + '</g>' +
+           '<g class="act" filter="url(#glow)">' + act + '</g>' +
+           '</svg></div><div class="shine"></div></div><div class="base"></div>';
+  }
+  var tubes = [];
+  function makeTube(parent) {
+    var el = document.createElement('div');
+    el.className = 'tube';
+    el.innerHTML = tubeHTML();
+    parent.appendChild(el);
+    var obj = { dgs: el.querySelectorAll('.dg'), cur: -1 };
+    obj.set = function (n) {
+      if (obj.cur === n) return;
+      if (obj.cur >= 0) obj.dgs[obj.cur].classList.remove('on');
+      obj.dgs[n].classList.add('on');
+      obj.cur = n;
+    };
+    tubes.push(obj);
+    return obj;
+  }
+  var nixieGroups = {};
+  document.querySelectorAll('#nixieClock .group').forEach(function (g) {
+    nixieGroups[g.dataset.unit] = [makeTube(g), makeTube(g)];
+  });
+  var nixieColons = document.querySelectorAll('#nixieClock .colon i');
+
+  // Kathoden-Entgiftung: zur vollen Stunde einmal alle Ziffern durchschalten
+  var busy = false;
+  function antiPoison() {
+    busy = true;
+    var i = 0;
+    var iv = setInterval(function () {
+      tubes.forEach(function (t) { t.set(i % 10); });
+      i++;
+      if (i >= 12) { clearInterval(iv); busy = false; tick(); }
+    }, 90);
+  }
+
+  /* ======================= ANALOG (elliptisch) ======================= */
+  var aHour = document.getElementById('aHour');
+  var aMin  = document.getElementById('aMin');
+  var aSec  = document.getElementById('aSec');
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var A_KY  = 40.5 / 91;                 // Seitenverhältnis der Zifferblatt-Ellipse
+  var calm  = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var aRaf  = 0;
+
+  function aEl(tag, attrs, parent) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  // Punkt auf der Ellipse: r = horizontaler Radius, a = Winkel (rad, im Uhrzeigersinn ab 12 Uhr)
+  function aPt(r, a) { return [100 + r * Math.sin(a), 50 - r * A_KY * Math.cos(a)]; }
+  function f2(n) { return n.toFixed(2); }
+
+  (function buildDial() {
+    var RAD = Math.PI / 180, i, a, p, q;
+
+    // Sunburst: feine Strahlen + zwei weiche Lichtkeile
+    var sun = document.getElementById('aSun');
+    for (i = 0; i < 240; i++) {
+      a = i * 1.5 * RAD;
+      p = aPt(14, a); q = aPt(95, a);
+      aEl('line', { x1: f2(p[0]), y1: f2(p[1]), x2: f2(q[0]), y2: f2(q[1]),
+                    stroke: '#fff', 'stroke-opacity': i % 2 ? .05 : .014, 'stroke-width': .3 }, sun);
+    }
+    [[35, 13, .06], [215, 13, .05]].forEach(function (w) {
+      var p1 = aPt(95, (w[0] - w[1]) * RAD), p2 = aPt(95, (w[0] + w[1]) * RAD);
+      aEl('polygon', { points: '100,50 ' + f2(p1[0]) + ',' + f2(p1[1]) + ' ' + f2(p2[0]) + ',' + f2(p2[1]),
+                       fill: '#fff', 'fill-opacity': w[2], filter: 'url(#aSoft)' }, sun);
+    });
+    aEl('ellipse', { cx: 100, cy: 50, rx: 30, ry: f2(30 * A_KY), fill: 'none',
+                     stroke: '#fff', 'stroke-opacity': .07, 'stroke-width': .35 }, sun);
+
+    var g = document.getElementById('aMarks');
+
+    // Ringnormale (senkrecht zur Ellipse) – nach innen versetzter Punkt im Abstand len
+    function ringIn(p, a, len) {
+      var nx = A_KY * Math.sin(a), ny = -Math.cos(a), nn = Math.sqrt(nx * nx + ny * ny);
+      return [p[0] - nx / nn * len, p[1] - ny / nn * len];
+    }
+
+    // Minutenschiene
+    [88, 84.2].forEach(function (r) {
+      aEl('ellipse', { cx: 100, cy: 50, rx: r, ry: f2(r * A_KY), fill: 'none',
+                       stroke: '#d9dde3', 'stroke-opacity': .55, 'stroke-width': .35 }, g);
+    });
+    for (i = 0; i < 60; i++) {
+      if (i % 5 === 0) continue;
+      a = i * 6 * RAD;
+      p = aPt(88, a); q = ringIn(p, a, 3.4);
+      aEl('line', { x1: f2(p[0]), y1: f2(p[1]), x2: f2(q[0]), y2: f2(q[1]),
+                    stroke: '#d9dde3', 'stroke-opacity': .85, 'stroke-width': .6 }, g);
+    }
+
+    // Stundenindizes: polierte Batons mit Leuchtmasse (12 Uhr als Doppelbaton)
+    function baton(a, off, w) {
+      var len = 8 + 4 * Math.abs(Math.sin(a));                 // am Rand länger, oben/unten kürzer
+      var tx = Math.cos(a), ty = A_KY * Math.sin(a), tn = Math.sqrt(tx * tx + ty * ty);
+      var o = aPt(86.2, a);
+      o = [o[0] + tx / tn * off, o[1] + ty / tn * off];
+      var n = ringIn(o, a, len);
+      var lo = ringIn(o, a, 1.2), ln = ringIn(o, a, len - 1.2);
+      aEl('line', { x1: f2(o[0]), y1: f2(o[1]), x2: f2(n[0]), y2: f2(n[1]),
+                    stroke: '#06070a', 'stroke-width': w + 1 }, g);
+      aEl('line', { x1: f2(o[0]), y1: f2(o[1]), x2: f2(n[0]), y2: f2(n[1]),
+                    stroke: '#e3e6eb', 'stroke-width': w }, g);
+      aEl('line', { x1: f2(lo[0]), y1: f2(lo[1]), x2: f2(ln[0]), y2: f2(ln[1]),
+                    stroke: '#bff0c6', 'stroke-width': w * .5, filter: 'url(#aLumeGlow)' }, g);
+    }
+    for (i = 0; i < 12; i += 3) {          // nur 12 / 3 / 6 / 9
+      a = i * 30 * RAD;
+      var w = 2.3 + 1.1 * Math.abs(Math.sin(a));
+      if (i === 0) { baton(a, -2.3, 2.1); baton(a, 2.3, 2.1); }
+      else baton(a, 0, w);
+    }
+
+    // Ziffern 12 / 3 / 6 / 9 und Beschriftung
+    [[100, 25.5, '12'], [158, 50, '3'], [100, 74.5, '6'], [42, 50, '9']].forEach(function (n) {
+      var t = aEl('text', { x: n[0], y: n[1], 'class': 'a-num' }, g);
+      t.textContent = n[2];
+    });
+    var b = aEl('text', { x: 100, y: 37, 'class': 'a-brand' }, g);  b.textContent = 'WEHNER';
+    var c = aEl('text', { x: 100, y: 63, 'class': 'a-sub' }, g);    c.textContent = 'QUARTZ';
+  })();
+
+  // Zeiger: feste Länge und Breite. Sie zeigen exakt auf die (elliptisch verteilten) Indizes,
+  // bleiben aber so kurz, dass die Spitze auch bei 12 und 6 Uhr im Zifferblatt liegt.
+  function setHand(el, theta) {
+    var phi = Math.atan2(Math.sin(theta), A_KY * Math.cos(theta)) * 180 / Math.PI;
+    el.setAttribute('transform', 'translate(100 50) rotate(' + phi.toFixed(3) + ')');
+  }
+  function analogUpdate(d) {
+    var s = d.getSeconds() + (calm ? 0 : d.getMilliseconds() / 1000);   // weicher Sekundenzeiger
+    var m = d.getMinutes() + s / 60;
+    var h = (d.getHours() % 12) + m / 60;
+    var R = Math.PI / 180;
+    setHand(aSec, s * 6 * R);
+    setHand(aMin, m * 6 * R);
+    setHand(aHour, h * 30 * R);
+  }
+  function analogLoop() { analogUpdate(new Date()); aRaf = requestAnimationFrame(analogLoop); }
+  function syncAnalogLoop() {
+    var want = !calm && document.body.classList.contains('face-analog') && document.visibilityState === 'visible';
+    if (want && !aRaf) aRaf = requestAnimationFrame(analogLoop);
+    else if (!want && aRaf) { cancelAnimationFrame(aRaf); aRaf = 0; }
+  }
+  document.addEventListener('visibilitychange', syncAnalogLoop);
+
+  /* ======================= Datum ======================= */
+  function isoWeek(d) {
+    var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    var day = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - day);
+    var y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - y0) / 864e5 + 1) / 7);
+  }
+  // Siebensegment-Darstellung (Segmente a-g in einer 12x20-Zelle)
+  var SEG = {
+    a: '2.4,1 3.4,0 8.6,0 9.6,1 8.6,2 3.4,2',
+    b: '11,1.8 12,2.8 12,8.2 11,9.2 10,8.2 10,2.8',
+    c: '11,10.8 12,11.8 12,17.2 11,18.2 10,17.2 10,11.8',
+    d: '2.4,19 3.4,18 8.6,18 9.6,19 8.6,20 3.4,20',
+    e: '1,10.8 2,11.8 2,17.2 1,18.2 0,17.2 0,11.8',
+    f: '1,1.8 2,2.8 2,8.2 1,9.2 0,8.2 0,2.8',
+    g: '2.4,10 3.4,9 8.6,9 9.6,10 8.6,11 3.4,11'
+  };
+  var PAT = { '-': 'g', '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg',
+              '5': 'acdfg', '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg' };
+  function seg7(ch) {
+    if (ch === '.') return '<i class="dot"></i>';
+    var on = PAT[ch] || '';
+    var s = '<svg class="s7" viewBox="0 0 12 20">';
+    'abcdefg'.split('').forEach(function (k) {
+      s += '<polygon class="' + (on.indexOf(k) >= 0 ? 'on' : '') + '" points="' + SEG[k] + '"/>';
+    });
+    return s + '</svg>';
+  }
+  function seg7str(str) { return str.split('').map(seg7).join(''); }
+
+  // 14-Segment-Zeichen für die Buchstaben der Wetteranzeige
+  var SEG14 = {
+    a: SEG.a, b: SEG.b, c: SEG.c, d: SEG.d, e: SEG.e, f: SEG.f,
+    g: '2.4,10 3.4,9 5.4,9 5.4,11 3.4,11',
+    h: '6.6,9 8.6,9 9.6,10 8.6,11 6.6,11',
+    i: '3.7,3 5.3,7.8 3.9,8.2 2.3,3.4',
+    j: '6,2.4 6.9,3.3 6.9,8 6,8.8 5.1,8 5.1,3.3',
+    k: '8.3,3 6.7,7.8 8.1,8.2 9.7,3.4',
+    l: '3.7,17 5.3,12.2 3.9,11.8 2.3,16.6',
+    m: '6,11.2 6.9,12 6.9,16.7 6,17.6 5.1,16.7 5.1,12',
+    n: '8.3,17 6.7,12.2 8.1,11.8 9.7,16.6'
+  };
+  var G14 = {
+    '0': 'abcdef', '1': 'bc', '2': 'abdegh', '3': 'abcdh', '4': 'bcfgh',
+    '5': 'acdfgh', '6': 'acdefgh', '7': 'abc', '8': 'abcdefgh', '9': 'abcdfgh',
+    A: 'abcefgh', B: 'abcdhjm', C: 'adef', D: 'abcdjm', E: 'adefgh', F: 'aefgh',
+    G: 'acdefh', H: 'bcefgh', I: 'adjm', J: 'bcde', K: 'efgkn', L: 'def',
+    M: 'bcefik', N: 'bcefin', O: 'abcdef', P: 'abefgh', Q: 'abcdefn', R: 'abefghn',
+    S: 'acdfgh', T: 'ajm', U: 'bcdef', V: 'efkl', W: 'bcefln', X: 'ikln',
+    Y: 'ikm', Z: 'adkl', '-': 'gh', ' ': ''
+  };
+  function seg14(ch) {
+    var on = G14[ch] || '';
+    var s = '<svg class="s7 sm" viewBox="0 0 12 20">';
+    'abcdefghijklmn'.split('').forEach(function (k) {
+      s += '<polygon class="' + (on.indexOf(k) >= 0 ? 'on' : '') + '" points="' + SEG14[k] + '"/>';
+    });
+    return s + '</svg>';
+  }
+  function seg14str(str) {
+    str = str.toUpperCase().replace(/Ä/g, 'AE').replace(/Ö/g, 'OE').replace(/Ü/g, 'UE');
+    return str.split('').map(seg14).join('');
+  }
+
+  function fitVfd(el) {
+    el.style.removeProperty('--u');
+    var need = el.scrollWidth, have = el.clientWidth;
+    if (need > have + 1) {
+      var k = Math.max(0.55, have / need * 0.98);
+      el.style.setProperty('--u', 'calc(min(0.8vw, 1.7vh) * ' + k.toFixed(3) + ')');
+    }
+  }
+  function fitAll() { document.querySelectorAll('.vfd').forEach(fitVfd); }
+  window.addEventListener('resize', fitAll);
+  window.addEventListener('orientationchange', function () { setTimeout(fitAll, 250); });
+
+  /* ======================= WETTERANZEIGE (rotierend) ======================= */
+  var weatherEl = document.getElementById('weather');
+  weatherEl.innerHTML =
+    '<div class="vfd-txt wslot"></div>' +
+    '<div class="vfd-date wtemp"></div>' +
+    '<div class="vfd-txt wdesc"></div>';
+  var wSlot = weatherEl.querySelector('.wslot');
+  var wTemp = weatherEl.querySelector('.wtemp');
+  var wDesc = weatherEl.querySelector('.wdesc');
+
+  function paintWeather(city, t, text) {
+    wSlot.innerHTML = seg14str(city);
+    var temp = seg7str(t === null ? '--' : String(t)) + '<i class="deg"></i>' + seg14('C');
+    wTemp.innerHTML = temp;
+    wDesc.innerHTML = seg14str(text);
+    fitVfd(weatherEl);
+  }
+  paintWeather('Accra', null, '');
+
+  /* ======================= LCD (Casio-Stil) ======================= */
+  function segEl(ch) {
+    var t = document.createElement('div');
+    t.innerHTML = seg7(ch || '8');
+    return t.firstChild;
+  }
+  function segSet(svg, ch) {
+    var on = PAT[ch] || '';
+    var polys = svg.querySelectorAll('polygon');
+    'abcdefg'.split('').forEach(function (k, i) { polys[i].classList.toggle('on', on.indexOf(k) >= 0); });
+  }
+  var lcdMain = document.getElementById('lcdMain');
+  var lcdSec  = document.getElementById('lcdSec');
+  var lcdDigits = { h: [segEl(), segEl()], m: [segEl(), segEl()], s: [segEl(), segEl()] };
+  var lcdColon = document.createElement('div');
+  lcdColon.className = 'lcd-colon';
+  lcdColon.innerHTML = '<i></i><i></i>';
+  lcdMain.appendChild(lcdDigits.h[0]); lcdMain.appendChild(lcdDigits.h[1]);
+  lcdMain.appendChild(lcdColon);
+  lcdMain.appendChild(lcdDigits.m[0]); lcdMain.appendChild(lcdDigits.m[1]);
+  lcdSec.appendChild(lcdDigits.s[0]);  lcdSec.appendChild(lcdDigits.s[1]);
+  var lcdShown = { h: '', m: '', s: '' };
+  function lcdUpdate(parts, secOdd) {
+    Object.keys(parts).forEach(function (u) {
+      if (lcdShown[u] === parts[u]) return;
+      lcdShown[u] = parts[u];
+      segSet(lcdDigits[u][0], parts[u][0]);
+      segSet(lcdDigits[u][1], parts[u][1]);
+    });
+    lcdColon.classList.toggle('off', secOdd);
+  }
+
+  var DAYS = ['MO', 'DI', 'MI', 'DO', 'FR', 'SA', 'SO'];
+  var dateEl = document.getElementById('date');
+  var lastDate = '';
+  function renderDate(d) {
+    var key = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+    if (key === lastDate) return;
+    lastDate = key;
+    var wd = (d.getDay() + 6) % 7;   // Montag = 0
+
+    document.getElementById('lcdDays').innerHTML = DAYS.map(function (n, i) {
+      return '<span' + (i === wd ? ' class="on"' : '') + '>' + n + '</span>';
+    }).join('');
+    document.getElementById('lcdDate').innerHTML =
+      seg7str(pad(d.getDate())) + '<i class="dot"></i>' + seg7str(pad(d.getMonth() + 1)) + '<i class="dot"></i>';
+    document.getElementById('lcdInfo').textContent = d.getFullYear() + '  KW ' + pad(isoWeek(d));
+    var days = DAYS.map(function (n, i) {
+      return '<span class="dy' + (i === wd ? ' on' : '') + '">' + n + '</span>';
+    }).join('');
+    var month = d.toLocaleDateString('de-DE', { month: 'long' });
+    dateEl.innerHTML =
+      '<div class="vfd-days">' + days + '</div>' +
+      '<div class="vfd-date">' + seg7str(pad(d.getDate())) + '<i class="dot"></i>' +
+        '<div class="mon">' + seg14str(month) + '</div>' + seg7str(String(d.getFullYear())) + '</div>' +
+      '<div class="vfd-kw"><span class="dy on">KW</span>' + seg7str(pad(isoWeek(d))) + '</div>';
+    fitVfd(dateEl);
+  }
+
+  /* ======================= Ticker ======================= */
+  var first = true;
+  var lastHour = null;
+  function tick() {
+    var d = new Date();
+    var hr = d.getHours();
+    renderDate(d);
+
+    body.classList.toggle('night', hr >= 22 || hr < 6);
+
+    var parts = { h: pad(hr), m: pad(d.getMinutes()), s: pad(d.getSeconds()) };
+
+    // Klapptafeln: nur animieren, wenn sichtbar
+    var animate = !first && body.classList.contains('face-flip');
+    Object.keys(parts).forEach(function (u) {
+      for (var i = 0; i < 2; i++) (animate ? flipTo : setInstant)(flipGroups[u][i], parts[u][i]);
+    });
+    first = false;
+
+    // LCD
+    lcdUpdate(parts, d.getSeconds() % 2 === 1);
+
+    // Analog (läuft die Animationsschleife, aktualisiert diese selbst)
+    if (!aRaf) analogUpdate(d);
+
+    // Nixie
+    if (busy) return;
+    if (lastHour !== null && hr !== lastHour) { lastHour = hr; antiPoison(); return; }
+    lastHour = hr;
+    Object.keys(parts).forEach(function (u) {
+      for (var i = 0; i < 2; i++) nixieGroups[u][i].set(+parts[u][i]);
+    });
+    var off = d.getSeconds() % 2 === 1;
+    nixieColons.forEach(function (c) { c.classList.toggle('off', off); });
+  }
+
+  /* ======================= Knöpfe: Theme + Watchface ======================= */
+  var themeMeta = document.querySelector('meta[name="theme-color"]');
+  var ICON_TUBE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                  '<path d="M7 20V10a5 5 0 0 1 10 0v10z"/><path d="M9.5 22.5h5"/><path d="M12 9v7"/></svg>';
+  var ICON_FLIP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                  '<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M4 12h16"/></svg>';
+  var ICON_LCD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                 '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 9.5h3v2.5H7zM7 12h3v2.5H7zM14 9.5h3M14 12h3M14 14.5h3"/></svg>';
+  var ICON_ANALOG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                    '<ellipse cx="12" cy="12" rx="9.5" ry="6.5"/><path d="M12 12V8.5"/><path d="M12 12l3 2.5"/><circle cx="12" cy="12" r=".8" fill="currentColor"/></svg>';
+
+  var theme = store.get('theme') === 'light' ? 'light' : 'dark';
+  var FACES = ['flip', 'nixie', 'lcd', 'analog'];
+  var face = FACES.indexOf(store.get('face')) >= 0 ? store.get('face') : 'flip';
+
+  function applyTheme() {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    var glyph = theme === 'light' ? '\u263E\uFE0E' : '\u2600\uFE0E';
+    document.querySelectorAll('.cbtn[data-act="theme"]').forEach(function (b) { b.textContent = glyph; });
+    if (themeMeta) themeMeta.setAttribute('content', theme === 'light' ? '#ece6d8' : '#0a0908');
+  }
+  function applyFace() {
+    body.classList.toggle('face-flip', face === 'flip');
+    body.classList.toggle('face-nixie', face === 'nixie');
+    body.classList.toggle('face-lcd', face === 'lcd');
+    body.classList.toggle('face-analog', face === 'analog');
+    // Icon zeigt das Watchface, zu dem man als Nächstes wechselt (Klapptafeln, Nixie, LCD, Analog)
+    var next = FACES[(FACES.indexOf(face) + 1) % FACES.length];
+    var icon = next === 'nixie' ? ICON_TUBE : next === 'lcd' ? ICON_LCD :
+               next === 'analog' ? ICON_ANALOG : ICON_FLIP;
+    document.querySelectorAll('.cbtn[data-act="face"]').forEach(function (b) { b.innerHTML = icon; });
+    syncAnalogLoop();
+    fitAll();
+  }
+
+  document.querySelectorAll('.cbtn').forEach(function (b) {
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (b.dataset.act === 'theme') {
+        theme = theme === 'light' ? 'dark' : 'light';
+        store.set('theme', theme);
+        applyTheme();
+      } else if (b.dataset.act === 'sec') {
+        secondsOn = !secondsOn;
+        store.set('noseconds', secondsOn ? '0' : '1');
+        applySeconds();
+      } else {
+        face = FACES[(FACES.indexOf(face) + 1) % FACES.length];
+        store.set('face', face);
+        applyFace();
+        tick();
+      }
+    });
+  });
+
+  var ICON_SEC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                 '<circle cx="12" cy="13.5" r="7"/><path d="M10 3h4"/><path d="M12 13.5V9.5"/><path d="M18 7l1.5-1.5"/></svg>';
+  var secondsOn = store.get('noseconds') !== '1';
+  function applySeconds() {
+    body.classList.toggle('noseconds', !secondsOn);
+    document.querySelectorAll('.cbtn[data-act="sec"]').forEach(function (b) {
+      b.innerHTML = ICON_SEC;
+      b.classList.toggle('on', secondsOn);
+    });
+    fitAll();
+  }
+
+  applyTheme();
+  applyFace();
+  applySeconds();
+  tick();
+  setInterval(tick, 250);
+
+  /* ======================= WETTER: 8 STÄDTE (Open-Meteo) ======================= */
+  var WMO = {
+    0: ['Klar', '☀️', '🌙'], 1: ['Überwiegend klar', '🌤️', '🌙'], 2: ['Teils bewölkt', '⛅', '☁️'],
+    3: ['Bedeckt', '☁️', '☁️'], 45: ['Nebel', '🌫️', '🌫️'], 48: ['Reifnebel', '🌫️', '🌫️'],
+    51: ['Leichter Nieselregen', '🌦️', '🌧️'], 53: ['Nieselregen', '🌦️', '🌧️'], 55: ['Starker Nieselregen', '🌧️', '🌧️'],
+    56: ['Gefrierender Niesel', '🌧️', '🌧️'], 57: ['Gefrierender Niesel', '🌧️', '🌧️'],
+    61: ['Leichter Regen', '🌦️', '🌧️'], 63: ['Regen', '🌧️', '🌧️'], 65: ['Starker Regen', '🌧️', '🌧️'],
+    66: ['Gefrierender Regen', '🌧️', '🌧️'], 67: ['Gefrierender Regen', '🌧️', '🌧️'],
+    71: ['Leichter Schnee', '🌨️', '🌨️'], 73: ['Schnee', '🌨️', '🌨️'], 75: ['Starker Schnee', '❄️', '❄️'],
+    77: ['Schneegriesel', '🌨️', '🌨️'], 80: ['Leichte Schauer', '🌦️', '🌧️'], 81: ['Regenschauer', '🌧️', '🌧️'],
+    82: ['Starke Schauer', '⛈️', '⛈️'], 85: ['Schneeschauer', '🌨️', '🌨️'], 86: ['Starke Schneeschauer', '❄️', '❄️'],
+    95: ['Gewitter', '⛈️', '⛈️'], 96: ['Gewitter mit Hagel', '⛈️', '⛈️'], 99: ['Gewitter mit Hagel', '⛈️', '⛈️']
+  };
+
+  var CITIES = [
+    { key: 'accra',     name: 'Accra',     lat: 5.6037,  lon: -0.1870  },
+    { key: 'bonn',      name: 'Bonn',      lat: 50.7374, lon: 7.0982   },
+    { key: 'berlin',    name: 'Berlin',    lat: 52.5200, lon: 13.4050  },
+    { key: 'ny',        name: 'New York',  lat: 40.7128, lon: -74.0060 },
+    { key: 'moskau',    name: 'Moskau',    lat: 55.7558, lon: 37.6173  },
+    { key: 'prag',      name: 'Prag',      lat: 50.0755, lon: 14.4378  },
+    { key: 'jakarta',   name: 'Jakarta',   lat: -6.2088, lon: 106.8456 },
+    { key: 'magdeburg', name: 'Magdeburg', lat: 52.1205, lon: 11.6276  }
+  ];
+  var weatherData = {};
+  CITIES.forEach(function (c) { weatherData[c.key] = { t: null, text: '' }; });
+  var currentCity = 0;
+
+  function loadCity(city) {
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + city.lat +
+              '&longitude=' + city.lon +
+              '&current=temperature_2m,weather_code,is_day&timezone=auto';
+    fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      var c = j.current;
+      if (!c) return;
+      var w = WMO[c.weather_code] || ['', '', ''];
+      weatherData[city.key] = { t: Math.round(c.temperature_2m), text: w[0] };
+      if (CITIES[currentCity].key === city.key && !rotating) {
+        paintWeather(city.name, weatherData[city.key].t, weatherData[city.key].text);
+      }
+    }).catch(function () {});
+  }
+  function loadAllWeather() { CITIES.forEach(loadCity); }
+
+  var rotating = false;
+  function rotateTo(i) {
+    if (rotating) return;
+    rotating = true;
+    var parts = [wSlot, wTemp, wDesc];
+    parts.forEach(function (p) { p.classList.add('wout'); p.classList.remove('win'); });
+    setTimeout(function () {
+      currentCity = i;
+      var c = CITIES[i];
+      var d = weatherData[c.key];
+      paintWeather(c.name, d.t, d.text);
+      parts.forEach(function (p) { p.classList.remove('wout'); p.classList.add('win'); });
+      void weatherEl.offsetWidth;
+      requestAnimationFrame(function () {
+        parts.forEach(function (p) { p.classList.remove('win'); });
+      });
+      setTimeout(function () { rotating = false; }, 950);
+    }, 900);
+  }
+
+  loadAllWeather();
+  setInterval(loadAllWeather, 10 * 60 * 1000);
+  setInterval(function () { rotateTo((currentCity + 1) % CITIES.length); }, 10 * 1000);
+
+  /* ======================= VFD-Flackern ======================= */
+  var reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function flickerOnce() {
+    var vfds = [].filter.call(document.querySelectorAll('.vfd'), function (el) { return el.offsetParent !== null; });
+    if (!vfds.length) return;
+    var v = vfds[Math.floor(Math.random() * vfds.length)];
+    var cands = v.querySelectorAll('.s7, .dy.on, .dot, .deg');
+    if (!cands.length) return;
+    var n = Math.random() < 0.25 ? 2 : 1;
+    var picked = [];
+    for (var i = 0; i < n; i++) picked.push(cands[Math.floor(Math.random() * cands.length)]);
+    function blink(on) { picked.forEach(function (e) { e.classList.toggle('fl', on); }); }
+    blink(true);
+    setTimeout(function () {
+      blink(false);
+      if (Math.random() < 0.35) {
+        setTimeout(function () {
+          blink(true);
+          setTimeout(function () { blink(false); }, rnd(30, 70));
+        }, rnd(40, 90));
+      }
+    }, rnd(40, 110));
+    if (Math.random() < 0.12) {
+      v.classList.add('dip');
+      setTimeout(function () { v.classList.remove('dip'); }, rnd(50, 90));
+    }
+  }
+  function scheduleFlicker() {
+    setTimeout(function () { flickerOnce(); scheduleFlicker(); }, rnd(800, 4500));
+  }
+  if (!reduceMotion) scheduleFlicker();
+
+  /* ======================= BURN-IN-SCHUTZ: PIXEL-SHIFT ======================= */
+  (function pixelShift() {
+    var caseEl = document.querySelector('.case');
+    function shift() {
+      var x = Math.floor(Math.random() * 5) - 2;
+      var y = Math.floor(Math.random() * 5) - 2;
+      caseEl.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+    }
+    shift();
+    setInterval(shift, 5 * 60 * 1000);
+  })();
+
+  /* ======================= BURN-IN-SCHUTZ: SCREENSAVER ======================= */
+  var SAVER_MS = 2 * 60 * 60 * 1000;
+  var saverTimer = null;
+  function resetSaver() {
+    document.body.classList.remove('saver');
+    if (saverTimer) clearTimeout(saverTimer);
+    saverTimer = setTimeout(function () {
+      document.body.classList.add('saver');
+    }, SAVER_MS);
+  }
+  ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) {
+    document.addEventListener(ev, resetSaver, { passive: true });
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') resetSaver();
+  });
+  resetSaver();
+
+  /* ======================= DISPLAY WACHHALTEN ======================= */
+  function wake() {
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').catch(function () {});
+  }
+  wake();
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') wake();
+  });
+
+  /* ======================= AUTO-RELOAD BEI NEUER VERSION ======================= */
+  (function autoReload() {
+    if (!/^https?:$/.test(location.protocol)) return;   // nur für http(s) sinnvoll
+    var CHECK_INTERVAL = 30000;
+    var KEY = 'uhr-etag';
+    var stored = null;
+    try { stored = localStorage.getItem(KEY); } catch (e) {}
+
+    async function checkForUpdate() {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        var response = await fetch(window.location.href, {
+          method: 'HEAD',
+          cache: 'no-cache'
+        });
+        if (!response.ok) return;
+        var current = response.headers.get('ETag') || response.headers.get('Last-Modified');
+        if (!current) return;
+
+        if (stored === null) {
+          stored = current;
+          try { localStorage.setItem(KEY, current); } catch (e) {}
+        } else if (current !== stored) {
+          try { localStorage.setItem(KEY, current); } catch (e) {}
+          window.location.reload();
+        }
+      } catch (e) {
+        /* Netzwerkfehler – beim nächsten Intervall erneut versuchen */
+      }
+    }
+
+    checkForUpdate();
+    setInterval(checkForUpdate, CHECK_INTERVAL);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') checkForUpdate();
+    });
+  })();
+
+})();
+</script>
+</body>
+</html>
+

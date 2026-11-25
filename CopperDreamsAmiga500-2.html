@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEURAL CORE – Copper Dreams · Amiga 500 Style Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=block" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:pointer}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  #scr{position:relative;border-radius:14px;overflow:hidden;box-shadow:0 0 80px rgba(90,140,255,.18)}
+  #c{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;filter:saturate(1.15) contrast(1.06)}
+  #scr::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,0) calc(var(--lh,3px)*.5),rgba(0,0,0,.28) calc(var(--lh,3px)*.5),rgba(0,0,0,.28) var(--lh,3px))}
+  #scr::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+    background:radial-gradient(ellipse at center,rgba(0,0,0,0) 62%,rgba(0,0,0,.55) 100%)}
+  #hint{position:fixed;left:0;right:0;bottom:8px;text-align:center;font:8px "Press Start 2P",monospace;color:#555;letter-spacing:1px;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="scr"><canvas id="c"></canvas></div></div>
+<div id="hint">F: VOLLBILD &nbsp;·&nbsp; M: TON AN/AUS</div>
+<script>
+'use strict';
+/* ================================================================
+   NEURAL CORE  –  "COPPER DREAMS"
+   320x256 PAL low-res · 12-bit colour · 4-channel realtime synth
+   ================================================================ */
+const W = 320, H = 256;
+const cv = document.getElementById('c'); cv.width = W; cv.height = H;
+const g = cv.getContext('2d', { alpha: false });
+g.imageSmoothingEnabled = false;
+const scr = document.getElementById('scr');
+const FONT = '"Press Start 2P", "Courier New", monospace';
+const TAU = Math.PI * 2;
+
+// 12-bit Amiga colour quantisation (4 bits per channel)
+const q4 = v => { v = v < 0 ? 0 : v > 255 ? 255 : v; return ((v | 0) >> 4) * 17; };
+const pack = (r, gg, b) => ((255 << 24) | (q4(b) << 16) | (q4(gg) << 8) | q4(r)) >>> 0;
+const rgb = (r, gg, b) => `rgb(${q4(r)},${q4(gg)},${q4(b)})`;
+const img = g.createImageData(W, H);
+const p32 = new Uint32Array(img.data.buffer);
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; return [c, x]; }
+function threshold(x, w, h) { const d = x.getImageData(0, 0, w, h); for (let i = 3; i < d.data.length; i += 4) d.data[i] = d.data[i] > 110 ? 255 : 0; x.putImageData(d, 0, 0); }
+
+function fit() {
+  const iw = innerWidth, ih = innerHeight - 22;
+  const w = Math.min(iw, ih * 4 / 3), h = w * 3 / 4;
+  scr.style.width = w + 'px'; scr.style.height = h + 'px';
+  scr.style.setProperty('--lh', (h / 256) + 'px');
+}
+addEventListener('resize', fit); fit();
+
+/* ---------------- texts ---------------- */
+const SCROLL = '                         HALLO DEMOSZENE!   NEURAL CORE PRAESENTIERT:  COPPER DREAMS  ...  ' +
+  'EINE LIEBESERKLAERUNG AN DEN AMIGA 500 ...   ALLES HIER LAEUFT IN ECHTZEIT: COPPERBARS, GLENZVEKTOREN, ' +
+  'SINUSSCROLLER, BOINGBALL, PLASMA, TWISTER, TEXTURTUNNEL UND DOTMORPHING ...   DIE MUSIK IST EIN 4-KANAL-TRACKERSONG, ' +
+  'KOMPLETT LIVE IM BROWSER SYNTHETISIERT - NULL SAMPLES, NULL BYTES MODFILE, NUR OSZILLATOREN UND RAUSCHEN ...   ' +
+  'PALETTE: ECHTE 12 BIT, 4096 FARBEN, WIE DAMALS ...   CODE, GRAFIK UND MUSIK: CLAUDE   ...   ' +
+  'GREETINGS AN ALLE CODER, PIXLER UND TRACKER-MUSIKER DA DRAUSSEN - IHR HABT DIE 80ER UND 90ER BUNTER GEMACHT!   ...   ' +
+  'UND JETZT BITTE ABSTIMMEN - UND ZWAR FUER UNS!  ;)   ...   TEXT RESTARTS ...                    ';
+const BOING_WORDS = ['OLDSCHOOL', 'NEVER', 'DIES!', 'BOING!'];
+const PLASMA_MSG = ['KEINE SAMPLES.', 'KEINE LIBRARIES.', 'NUR MATHE.', 'UND LIEBE.'];
+const CRED = ['', '', 'CODE ........ CLAUDE', 'GRAFIK ...... CLAUDE', 'MUSIK ....... CLAUDE', '',
+  '4 KANAELE', '0 SAMPLES', '100% ECHTZEIT', '', 'DANKE FUERS ZUSCHAUEN!'];
+
+/* ---------------- glyphs & logo ---------------- */
+const GW = 16, GH = 18, GLY = {};
+function buildGlyphs(str) {
+  for (const ch of new Set(str)) {
+    if (GLY[ch] || ch === ' ') continue;
+    const [m, mx] = mk(GW, GH);
+    mx.font = `16px ${FONT}`; mx.textBaseline = 'top'; mx.fillStyle = '#fff'; mx.fillText(ch, 0, 0);
+    threshold(mx, GW, GH);
+    mx.globalCompositeOperation = 'source-in';
+    const gr = mx.createLinearGradient(0, 0, 0, 16);
+    gr.addColorStop(0, '#ffffee'); gr.addColorStop(.3, '#ffdd44'); gr.addColorStop(.62, '#ff6611'); gr.addColorStop(1, '#bb1177');
+    mx.fillStyle = gr; mx.fillRect(0, 0, GW, GH);
+    const [c, x] = mk(GW, GH);
+    x.drawImage(m, 2, 2); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#110022'; x.fillRect(0, 0, GW, GH);
+    x.globalCompositeOperation = 'source-over'; x.drawImage(m, 0, 0);
+    GLY[ch] = c;
+  }
+}
+let LOGO, LW, LH;
+function buildLogo() {
+  const txt = 'NEURAL CORE', sz = 24; LW = txt.length * sz + 10; LH = sz + 10;
+  const [m, mx] = mk(LW, LH);
+  mx.font = `${sz}px ${FONT}`; mx.textBaseline = 'top'; mx.fillStyle = '#fff'; mx.fillText(txt, 3, 3); threshold(mx, LW, LH);
+  const tint = col => { const [t, tx] = mk(LW, LH); tx.drawImage(m, 0, 0); tx.globalCompositeOperation = 'source-in'; tx.fillStyle = col; tx.fillRect(0, 0, LW, LH); return t; };
+  const [c, x] = mk(LW, LH);
+  const ext = tint('#331177'), dark = tint('#000');
+  for (let i = 5; i >= 1; i--) x.drawImage(ext, i, i);
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) x.drawImage(dark, dx, dy);
+  const [cc, cx] = mk(LW, LH); cx.drawImage(m, 0, 0); cx.globalCompositeOperation = 'source-in';
+  const gr = cx.createLinearGradient(0, 3, 0, 3 + sz);
+  gr.addColorStop(0, '#ffffff'); gr.addColorStop(.44, '#66ccff'); gr.addColorStop(.5, '#112244');
+  gr.addColorStop(.56, '#ffcc66'); gr.addColorStop(1, '#aa3300');
+  cx.fillStyle = gr; cx.fillRect(0, 0, LW, LH);
+  x.drawImage(cc, 0, 0); LOGO = c;
+}
+function drawLogo(t, y0, amp) {
+  const x0 = (W - LW) / 2;
+  for (let y = 0; y < LH; y++) {
+    const dx = Math.sin(y * 0.18 + t * 5) * amp + Math.sin(t * 1.3) * 6;
+    g.drawImage(LOGO, 0, y, LW, 1, (x0 + dx) | 0, y0 + y, LW, 1);
+  }
+}
+function txt(s, x, y, col, size = 8, full) {
+  g.font = `${size}px ${FONT}`; g.textBaseline = 'top'; g.fillStyle = col;
+  if (x === 'c') x = ((W - (full || s).length * size) / 2) | 0;
+  g.fillText(s, x, y);
+}
+function big(s, x, y, sc = 1) {
+  const w = s.length * 16 * sc;
+  if (x === 'c') x = (W - w) / 2;
+  for (let i = 0; i < s.length; i++) { const gl = GLY[s[i]]; if (gl) g.drawImage(gl, (x + i * 16 * sc) | 0, y | 0, GW * sc, GH * sc); }
+}
+
+/* ---------------- shared effects ---------------- */
+let dt = 0;
+const STARS = []; for (let i = 0; i < 240; i++) STARS.push([Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random()]);
+function stars(speed, cx = 160, cy = 128) {
+  for (const s of STARS) {
+    s[2] -= dt * speed;
+    if (s[2] <= 0.02) { s[0] = Math.random() * 2 - 1; s[1] = Math.random() * 2 - 1; s[2] = 1; }
+    const z = s[2], x = cx + s[0] / z * 120, y = cy + s[1] / z * 100;
+    if (x < 0 || x >= W || y < 0 || y >= H) continue;
+    const b = (1 - z) * 290; g.fillStyle = rgb(b, b, b + 30);
+    const sz = z < 0.25 ? 2 : 1; g.fillRect(x | 0, y | 0, sz, sz);
+  }
+}
+function copper(t, y0, y1, n, boost) {
+  const mid = (y0 + y1) / 2, amp = (y1 - y0) / 2 - 8;
+  for (let i = n - 1; i >= 0; i--) {
+    const cy = mid + Math.sin(t * 1.9 + i * 0.5) * amp, hue = (i * 360 / n + t * 40) % 360;
+    for (let k = -7; k <= 7; k++) {
+      const b = 1 - Math.abs(k) / 8;
+      g.fillStyle = `hsl(${hue | 0},90%,${Math.min(85, 6 + b * b * 62 * boost) | 0}%)`;
+      g.fillRect(0, (cy + k) | 0, W, 1);
+    }
+  }
+}
+function scroller(t, baseY, amp) {
+  const totW = SCROLL.length * 16, pos = (t * 95) % (totW + W);
+  const first = Math.max(0, Math.floor((pos - W - 16) / 16));
+  for (let i = first; i < SCROLL.length; i++) {
+    const x = W + i * 16 - pos; if (x > W) break;
+    const gl = GLY[SCROLL[i]]; if (!gl) continue;
+    for (let s = 0; s < 8; s++) {
+      const cx = x + s * 2;
+      const y = baseY + Math.sin(cx * 0.04 + t * 3) * amp + Math.sin(cx * 0.013 - t * 1.3) * amp * 0.4;
+      g.drawImage(gl, s * 2, 0, 2, GH, cx | 0, y | 0, 2, GH);
+    }
+  }
+}
+const [TMP, tg] = mk(W, H);
+function reflect(t, MY) {
+  tg.drawImage(cv, 0, 0);
+  const RH = H - MY;
+  g.fillStyle = '#000'; g.fillRect(0, MY, W, RH);
+  for (let j = 0; j < RH; j++) {
+    const sy = MY - 1 - j * 1.15; if (sy < 0) break;
+    const dx = Math.sin(j * 0.35 + t * 5) * (0.5 + j * 0.07);
+    g.drawImage(TMP, 0, sy | 0, W, 1, dx, MY + j, W, 1);
+  }
+  g.fillStyle = 'rgba(0,30,100,0.5)'; g.fillRect(0, MY, W, RH);
+  g.fillStyle = '#88ccff'; g.fillRect(0, MY, W, 1);
+}
+function bgGrad(top, bot) {
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, top); gr.addColorStop(1, bot);
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+}
+
+/* ---------------- glenz vector ---------------- */
+const GV = []; for (let i = 0; i < 8; i++) GV.push([i & 1 ? 1 : -1, i & 2 ? 1 : -1, i & 4 ? 1 : -1]);
+const FACES = [[1, 3, 7, 5, [1, 0, 0]], [0, 4, 6, 2, [-1, 0, 0]], [2, 6, 7, 3, [0, 1, 0]], [0, 1, 5, 4, [0, -1, 0]], [4, 5, 7, 6, [0, 0, 1]], [0, 2, 3, 1, [0, 0, -1]]];
+const GT = [];
+for (const f of FACES) { const ai = GV.length; GV.push(f[4].map(v => v * 1.9)); for (let k = 0; k < 4; k++) GT.push([f[k], f[(k + 1) % 4], ai]); }
+function glenz(t, cx, cy, sc) {
+  const sa = Math.sin(t * 0.9), ca = Math.cos(t * 0.9), sb = Math.sin(t * 1.3), cb = Math.cos(t * 1.3), s3 = Math.sin(t * 0.4), c3 = Math.cos(t * 0.4);
+  const P = GV.map(([x, y, z]) => {
+    const y1 = y * ca - z * sa, z1 = y * sa + z * ca;
+    const x2 = x * cb + z1 * sb, z2 = -x * sb + z1 * cb;
+    const x3 = x2 * c3 - y1 * s3, y3 = x2 * s3 + y1 * c3;
+    return [x3 * sc, y3 * sc, z2 * sc];
+  });
+  const D = 5.5, F = 110, tris = [];
+  GT.forEach((tr, i) => {
+    const a = P[tr[0]], b = P[tr[1]], c = P[tr[2]];
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const mx = (a[0] + b[0] + c[0]) / 3, my = (a[1] + b[1] + c[1]) / 3, mz = (a[2] + b[2] + c[2]) / 3;
+    if (nx * mx + ny * my + nz * mz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+    const front = nx * mx + ny * my + nz * (mz + D) < 0;
+    const l = Math.max(0, -0.4 * nx - 0.5 * ny - 0.77 * nz);
+    tris.push({ z: mz, front, l, a, b, c, col: i & 1 });
+  });
+  tris.sort((p, q) => q.z - p.z);
+  for (const tr of tris) {
+    const base = tr.col ? [235, 240, 255] : [40, 100, 255];
+    const k = tr.front ? 0.35 + 0.75 * tr.l : 0.35;
+    g.globalAlpha = tr.front ? 0.62 : 0.55;
+    g.fillStyle = rgb(base[0] * k, base[1] * k, base[2] * k);
+    g.beginPath();
+    for (const p of [tr.a, tr.b, tr.c]) { const s = F / (p[2] + D); g.lineTo(cx + p[0] * s, cy + p[1] * s); }
+    g.closePath(); g.fill();
+  }
+  g.globalAlpha = 1;
+}
+
+/* ---------------- boing ball ---------------- */
+const BR = 34, BS = BR * 2 + 2;
+const [BC, bxc] = mk(BS, BS);
+const bimg = bxc.createImageData(BS, BS), b32 = new Uint32Array(bimg.data.buffer);
+function renderBall(spin, tilt) {
+  const ct = Math.cos(tilt), st = Math.sin(tilt), seg = Math.PI / 8;
+  for (let py = 0; py < BS; py++) for (let px = 0; px < BS; px++) {
+    const dx = (px - BR - 0.5) / BR, dy = (py - BR - 0.5) / BR, d2 = dx * dx + dy * dy, o = py * BS + px;
+    if (d2 > 1) { b32[o] = 0; continue; }
+    const nz = Math.sqrt(1 - d2), x = dx * ct - dy * st, y = dx * st + dy * ct;
+    const lon = Math.atan2(x, nz) + spin, lat = Math.asin(Math.max(-1, Math.min(1, y)));
+    const red = ((Math.floor(lon / seg) + Math.floor((lat + Math.PI / 2) / seg)) & 1) === 0;
+    const l = 0.28 + 0.8 * Math.max(0, -0.45 * dx - 0.5 * dy + 0.74 * nz);
+    b32[o] = red ? pack(240 * l, 25 * l, 35 * l) : pack(250 * l, 250 * l, 250 * l);
+  }
+  bxc.putImageData(bimg, 0, 0);
+}
+let spinAcc = 0;
+function boingScene(t, songT) {
+  const HZ = 176;
+  g.fillStyle = rgb(176, 176, 188); g.fillRect(0, 0, W, H);
+  g.fillStyle = rgb(170, 40, 180);
+  for (let x = 8; x < W; x += 24) g.fillRect(x, 0, 1, HZ);
+  for (let y = 8; y < HZ; y += 24) g.fillRect(0, y, W, 1);
+  g.fillStyle = rgb(150, 150, 168); g.fillRect(0, HZ, W, H - HZ);
+  g.strokeStyle = rgb(170, 40, 180); g.lineWidth = 1; g.beginPath();
+  for (let x = 8 - 24 * 8; x < W + 24 * 8; x += 24) { g.moveTo(x + 0.5, HZ); g.lineTo(160 + (x - 160) * 1.9 + 0.5, H); }
+  for (let k = 0; k < 7; k++) { const y = (HZ + Math.pow(k / 6, 1.7) * (H - HZ)) | 0; g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); }
+  g.stroke();
+  // raster band + words
+  copper(t, 2, 50, 4, 0.9);
+  const w = BOING_WORDS[Math.floor(songT / 1.92) % 4], sc = 1.5 + snP * 0.5;
+  big(w, 'c', 26 - GH * sc / 2, sc);
+  // ball
+  const ph = (songT / 0.96) % 1, hb = Math.sin(Math.PI * ph);
+  const by = HZ + 18 - BR - hb * 108;
+  const tri = (t * 0.16) % 2, fx = tri < 1 ? tri : 2 - tri, dir = tri < 1 ? 1 : -1;
+  const bxp = BR + 6 + fx * (W - 2 * BR - 12);
+  spinAcc += dt * dir * 2.6; renderBall(spinAcc, 0.38);
+  g.fillStyle = 'rgba(40,0,60,0.35)'; g.beginPath(); g.arc(bxp + 16, by + 6, BR, 0, TAU); g.fill();
+  g.drawImage(BC, (bxp - BR - 1) | 0, (by - BR - 1) | 0);
+  scroller(songT, 218, 8);
+}
+
+/* ---------------- plasma + twister ---------------- */
+const SI = new Int32Array(256); for (let i = 0; i < 256; i++) SI[i] = (Math.sin(i / 256 * TAU) * 63 + 64) | 0;
+const PAL = new Uint32Array(256);
+for (let i = 0; i < 256; i++) { const x = i / 256 * TAU; PAL[i] = pack(110 + 100 * Math.cos(x), 90 + 90 * Math.cos(x + 2.1), 140 + 110 * Math.cos(x + 4.2)); }
+const RAD = new Uint16Array(W * H);
+for (let y = 0, o = 0; y < H; y++) for (let x = 0; x < W; x++, o++) RAD[o] = (Math.hypot(x - 160, y - 128) * 2.2) | 0;
+function plasma(t) {
+  const a = (t * 47) | 0, b = (t * -31) | 0, c = (t * 23) | 0, d = (t * -60) | 0, sh = (t * 40) | 0;
+  let o = 0;
+  for (let y = 0; y < H; y++) {
+    const sy = SI[(y * 3 + b) & 255];
+    for (let x = 0; x < W; x++, o++) {
+      const v = SI[(x * 2 + a) & 255] + sy + SI[((x + y) + c) & 255] + SI[(RAD[o] + d) & 255];
+      p32[o] = PAL[((v >> 1) + sh) & 255];
+    }
+  }
+  g.putImageData(img, 0, 0);
+}
+const TWC = [[255, 80, 80], [255, 220, 60], [60, 220, 255], [170, 90, 255]];
+const TWL = TWC.map(c => Array.from({ length: 33 }, (_, i) => { const k = 0.15 + 0.85 * i / 32; return rgb(c[0] * k, c[1] * k, c[2] * k); }));
+function twister(t) {
+  const w = 34, hp = Math.PI / 2;
+  for (let y = 0; y < H; y++) {
+    const cx = 160 + Math.sin(t * 0.9 + y * 0.011) * 70;
+    const a = t * 2.2 + Math.sin(t * 0.6 + y * 0.009) * 2.6;
+    const x0 = cx + Math.sin(a) * w, x1 = cx + Math.sin(a + hp) * w, x2 = cx + Math.sin(a + 2 * hp) * w, x3 = cx + Math.sin(a + 3 * hp) * w;
+    const xs = [x0, x1, x2, x3, x0];
+    g.fillStyle = 'rgba(0,0,0,0.35)';
+    g.fillRect((Math.min(x0, x1, x2, x3) + 6) | 0, y, (Math.max(x0, x1, x2, x3) - Math.min(x0, x1, x2, x3)) | 0, 1);
+    for (let i = 0; i < 4; i++) {
+      const p = xs[i], q = xs[i + 1];
+      if (q > p) { const s = Math.min(32, ((q - p) / (w * 1.4143) * 32) | 0); g.fillStyle = TWL[i][s]; g.fillRect(p | 0, y, ((q - p) + 1) | 0, 1); }
+    }
+  }
+}
+function plasmaScene(t, songT) {
+  plasma(t); twister(t);
+  g.fillStyle = 'rgba(0,0,20,0.6)'; g.fillRect(0, 14, W, 30);
+  const bi = Math.floor(t / 1.92), msg = PLASMA_MSG[bi % 4], lt = t - bi * 1.92;
+  const n = Math.min(msg.length, Math.floor(lt * 18));
+  const x0 = (W - msg.length * 16) / 2;
+  big(msg.slice(0, n), x0, 20, 1);
+  scroller(songT, 212, 12);
+}
+
+/* ---------------- tunnel + bobs ---------------- */
+const TW = W * 2, TH = H * 2;
+const TD = new Uint16Array(TW * TH), TA = new Uint8Array(TW * TH), TS = new Uint8Array(TW * TH);
+for (let y = 0, i = 0; y < TH; y++) for (let x = 0; x < TW; x++, i++) {
+  const dx = x - W, dy = y - H, r = Math.sqrt(dx * dx + dy * dy) + 0.0001;
+  TD[i] = (5200 / r) & 0xffff;
+  TA[i] = ((Math.atan2(dy, dx) / TAU + 0.5) * 256) & 255;
+  TS[i] = Math.min(7, (r / 20) | 0);
+}
+const TEXS = new Uint32Array(8 * 65536);
+for (let v = 0; v < 256; v++) for (let u = 0; u < 256; u++) {
+  const n = (u ^ v) & 63, ch = ((u >> 5) ^ (v >> 4)) & 1;
+  let r, gg, b;
+  if (ch) { r = 40 + n * 1.5; gg = 10 + n * 0.6; b = 100 + n * 2; } else { r = 10 + n * 0.4; gg = 40 + n * 2; b = 80 + n * 2; }
+  if ((u & 31) < 2 || (v & 15) < 1) { r = 210; gg = 255; b = 255; }
+  for (let s = 0; s < 8; s++) { const k = (s + 1) / 8; TEXS[(s << 16) | (v << 8) | u] = pack(r * k, gg * k, b * k); }
+}
+function tunnel(t) {
+  const sx = (W / 2 + Math.sin(t * 0.8) * W * 0.33) | 0, sy = (H / 2 + Math.sin(t * 1.1) * H * 0.33) | 0;
+  const du = (t * 110) | 0, dv = (t * 28 + Math.sin(t * 0.5) * 40) | 0;
+  let o = 0;
+  for (let y = 0; y < H; y++) {
+    let ti = (y + sy) * TW + sx;
+    for (let x = 0; x < W; x++, ti++) p32[o++] = TEXS[(TS[ti] << 16) | (((TA[ti] + dv) & 255) << 8) | ((TD[ti] + du) & 255)];
+  }
+  g.putImageData(img, 0, 0);
+}
+const BOBS = [[255, 90, 200], [90, 220, 255], [255, 230, 90]].map(c => {
+  const [bc, x] = mk(16, 16);
+  const gr = x.createRadialGradient(6, 5, 0.5, 8, 8, 8);
+  gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, rgb(...c)); gr.addColorStop(1, rgb(c[0] * .2, c[1] * .2, c[2] * .2));
+  x.fillStyle = gr; x.beginPath(); x.arc(8, 8, 7.5, 0, TAU); x.fill(); threshold(x, 16, 16);
+  return bc;
+});
+function bobs(t, n, cx, cy, pulse) {
+  const arr = [], cr = Math.cos(t * 0.7), sr = Math.sin(t * 0.7);
+  for (let i = 0; i < n; i++) {
+    const a = t * 1.1 + i * TAU / n;
+    let x = Math.sin(a * 2 + t * 0.3) * 1.25, y = Math.sin(a * 3) * 0.75, z = Math.cos(a * 2) * 1.25;
+    const x2 = x * cr + z * sr, z2 = -x * sr + z * cr;
+    arr.push([x2 * pulse, y * pulse, z2, i % 3]);
+  }
+  arr.sort((p, q) => q[2] - p[2]);
+  for (const [x, y, z, c] of arr) {
+    const s = 4 / (z + 4), size = (18 * s) | 0;
+    g.drawImage(BOBS[c], (cx + x * 110 * s - size / 2) | 0, (cy + y * 110 * s - size / 2) | 0, size, size);
+  }
+}
+function tunnelScene(t, songT) {
+  tunnel(t);
+  bobs(t, 21, 160, 112, 1 + kickP * 0.15);
+  if (kickP > 0.05) { g.fillStyle = `rgba(255,255,255,${kickP * 0.1})`; g.fillRect(0, 0, W, H); }
+  scroller(songT, 208, 10);
+}
+
+/* ---------------- dot morph ---------------- */
+const ND = 480, SHAPES = [];
+(() => {
+  const sph = new Float32Array(ND * 3), tor = new Float32Array(ND * 3), cub = new Float32Array(ND * 3), hel = new Float32Array(ND * 3);
+  for (let i = 0; i < ND; i++) {
+    const y = 1 - 2 * (i + .5) / ND, r = Math.sqrt(1 - y * y), ph = i * 2.39996;
+    sph.set([Math.cos(ph) * r, y, Math.sin(ph) * r], i * 3);
+    const a = (i % 24) / 24 * TAU, b = Math.floor(i / 24) / 20 * TAU;
+    tor.set([(0.8 + 0.32 * Math.cos(a)) * Math.cos(b), 0.32 * Math.sin(a), (0.8 + 0.32 * Math.cos(a)) * Math.sin(b)], i * 3);
+    const e = i % 12, s = (Math.floor(i / 12) / 40) * 2 - 1, ax = e >> 2, v = [0, 0, 0];
+    v[ax] = s * 0.75; v[(ax + 1) % 3] = (e & 1) ? 0.75 : -0.75; v[(ax + 2) % 3] = (e & 2) ? 0.75 : -0.75; cub.set(v, i * 3);
+    const k = i >> 1, ang = k * 0.19 + (i & 1) * Math.PI;
+    hel.set([Math.cos(ang) * 0.45, (k / (ND / 2)) * 2 - 1, Math.sin(ang) * 0.45], i * 3);
+  }
+  SHAPES.push(sph, tor, cub, hel);
+})();
+const DCOL = Array.from({ length: 16 }, (_, i) => rgb(20 + i * 15, 40 + i * 14, 120 + i * 9));
+function dots(t, cx, cy, sc) {
+  const per = 3.84, k = Math.floor(t / per), ph = t / per - k;
+  const A = SHAPES[k % 4], B = SHAPES[(k + 1) % 4];
+  let m = ph < 0.6 ? 0 : (ph - 0.6) / 0.4; m = m * m * (3 - 2 * m);
+  const sa = Math.sin(t * 0.7), ca = Math.cos(t * 0.7), sb = Math.sin(t * 0.45), cb = Math.cos(t * 0.45);
+  for (let i = 0, j = 0; i < ND; i++, j += 3) {
+    const x = A[j] + (B[j] - A[j]) * m, y = A[j + 1] + (B[j + 1] - A[j + 1]) * m, z = A[j + 2] + (B[j + 2] - A[j + 2]) * m;
+    const x1 = x * ca + z * sa, z1 = -x * sa + z * ca;
+    const y2 = y * cb - z1 * sb, z2 = y * sb + z1 * cb + 3.2;
+    const s = 130 * sc / z2;
+    const ci = Math.max(0, Math.min(15, ((4.2 - z2) / 2 * 15) | 0));
+    g.fillStyle = DCOL[ci];
+    const sz = ci > 9 ? 2 : 1;
+    g.fillRect((cx + x1 * s) | 0, (cy + y2 * s) | 0, sz, sz);
+  }
+}
+
+/* ---------------- scenes ---------------- */
+function mainScene(t, songT) {
+  bgGrad('#000814', '#100020');
+  stars(0.35);
+  copper(t, 66, 176, 6, 1 + snP * 0.35);
+  glenz(t, 160, 120, 1.08 * (1 + kickP * 0.14));
+  drawLogo(t, 10, 3 + snP * 7);
+  scroller(songT, 180, 14);
+  reflect(t, 214);
+}
+function finaleScene(t, songT) {
+  bgGrad('#05000f', '#200030');
+  stars(0.7);
+  copper(t, 0, 56, 4, 0.8 + snP * 0.4);
+  drawLogo(t, 12, 3 + snP * 7);
+  dots(t, 160, 124, 1 + kickP * 0.1);
+  scroller(songT, 182, 14);
+  reflect(t, 216);
+}
+function introScene(T) {
+  if (T < 1.6) {
+    let seed = (T * 50) | 0;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    for (let y = 0; y < H;) { const h = 2 + (rnd() * 9 | 0); g.fillStyle = rgb(rnd() * 255, rnd() * 255, rnd() * 255); g.fillRect(0, y, W, h); y += h; }
+    g.fillStyle = '#000'; g.fillRect(24, 20, W - 48, H - 40);
+    txt('LOADING' + '...'.slice(0, (T * 4 | 0) % 4), 'c', 124, '#88aaff', 8, 'LOADING...');
+    return;
+  }
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  stars(0.12);
+  const ty = (s, t0, cps) => s.slice(0, Math.max(0, Math.floor((T - t0) * cps)));
+  const cur = (s, full, t0, size, y, col) => {
+    const sh = ty(s, t0, 12); if (T < t0) return;
+    txt(sh, 'c', y, col, size, full);
+    if (sh.length < full.length || (T * 3 | 0) % 2) {
+      const x = ((W - full.length * size) / 2) + sh.length * size;
+      if (sh.length < full.length) { g.fillStyle = col; g.fillRect(x | 0, y, size, size); }
+    }
+  };
+  cur('NEURAL CORE', 'NEURAL CORE', 1.9, 16, 64, '#77ddff');
+  cur('PRESENTS', 'PRESENTS', 3.3, 8, 92, '#aaaaaa');
+  if (T > 4.5) {
+    const s = Math.max(1, 5 - (T - 4.5) * 8);
+    big('COPPER DREAMS', 'c', 128 - GH * s / 2, s);
+  }
+  if (T > 6) cur('A TRIBUTE IN 4 CHANNELS', 'A TRIBUTE IN 4 CHANNELS', 6, 8, 160, '#ff9955');
+}
+function endScene(T) {
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  stars(0.1);
+  copper(T, 214, 252, 3, 0.7);
+  big('COPPER DREAMS', 'c', 16, 1);
+  CRED.forEach((l, i) => {
+    if (!l) return;
+    const t0 = 0.5 + i * 0.45; if (T < t0) return;
+    const sh = l.slice(0, Math.floor((T - t0) * 30));
+    const hue = (i * 30 + T * 60) % 360;
+    g.font = `8px ${FONT}`; g.textBaseline = 'top'; g.fillStyle = `hsl(${hue | 0},80%,70%)`;
+    g.fillText(sh, ((W - l.length * 8) / 2) | 0, 40 + i * 15);
+  });
+}
+function titleScreen(t) {
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  stars(0.15);
+  copper(t, 86, 150, 4, 0.9);
+  drawLogo(t, 34, 3);
+  big('COPPER DREAMS', 'c', 110, 1);
+  if ((t * 2 | 0) % 2) txt('KLICKEN ODER LEERTASTE', 'c', 180, '#ffffff');
+  txt('AMIGA 500 STYLE  -  4 KANAL SYNTH', 'c', 226, '#666688');
+  txt('NEURAL CORE 2026', 'c', 238, '#444466');
+}
+
+/* ================================================================
+   AUDIO  –  4-channel tracker synth (ProTracker timing: speed 6, BPM 125)
+   ================================================================ */
+const TICK = 0.02, ROW = TICK * 6;
+let AC = null, master, busL, busR, busC, delayIn, NOISE, PULSE, startT = 0, nextRowT = 0, absRow = 0, muted = false;
+const evQ = [];
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function initAudio() {
+  try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; return; }
+  master = AC.createGain(); master.gain.value = 0.7;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7800; lp.Q.value = 0.4; // "LED filter"
+  const comp = AC.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.15;
+  master.connect(lp); lp.connect(comp); comp.connect(AC.destination);
+  const makeBus = p => { const gn = AC.createGain(); if (AC.createStereoPanner) { const pn = AC.createStereoPanner(); pn.pan.value = p; gn.connect(pn); pn.connect(master); } else gn.connect(master); return gn; };
+  busL = makeBus(-0.5); busR = makeBus(0.45); busC = makeBus(0);
+  // echo
+  delayIn = AC.createGain();
+  const dl = AC.createDelay(1); dl.delayTime.value = ROW * 3;
+  const dlp = AC.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 2800;
+  const fb = AC.createGain(); fb.gain.value = 0.38;
+  const wet = makeBus(-0.6); const wg = AC.createGain(); wg.gain.value = 0.45;
+  delayIn.connect(dl); dl.connect(dlp); dlp.connect(fb); fb.connect(dl); dlp.connect(wg); wg.connect(wet);
+  NOISE = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+  const nd = NOISE.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  const N = 48, re = new Float32Array(N), im = new Float32Array(N);
+  for (let n = 1; n < N; n++) re[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * 0.25);
+  PULSE = AC.createPeriodicWave(re, im);
+}
+function arp(t, notes, vol, cut) {
+  if (!AC) return;
+  const o = AC.createOscillator(); o.setPeriodicWave(PULSE);
+  const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut;
+  const gn = AC.createGain();
+  gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(vol, t + 0.003);
+  gn.gain.linearRampToValueAtTime(vol * 0.6, t + ROW - 0.008); gn.gain.linearRampToValueAtTime(0, t + ROW);
+  for (let k = 0; k < 6; k++) o.frequency.setValueAtTime(mtof(notes[k % 3]), t + k * TICK);
+  o.connect(f); f.connect(gn); gn.connect(busL); o.start(t); o.stop(t + ROW + 0.02);
+}
+function bass(t, m, len, vol) {
+  if (!AC) return;
+  const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m);
+  const o2 = AC.createOscillator(); o2.type = 'square'; o2.frequency.value = mtof(m - 12);
+  const g2 = AC.createGain(); g2.gain.value = 0.45;
+  const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 7;
+  f.frequency.setValueAtTime(2400, t); f.frequency.exponentialRampToValueAtTime(260, t + 0.16);
+  const gn = AC.createGain(), e = t + len;
+  gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(vol, t + 0.004);
+  gn.gain.setValueAtTime(vol, e - 0.02); gn.gain.linearRampToValueAtTime(0, e);
+  o.connect(f); o2.connect(g2); g2.connect(f); f.connect(gn); gn.connect(busC);
+  o.start(t); o2.start(t); o.stop(e + 0.02); o2.stop(e + 0.02);
+}
+function lead(t, m, len, vol) {
+  if (!AC) return;
+  const o = AC.createOscillator(); o.type = 'sawtooth';
+  const o2 = AC.createOscillator(); o2.setPeriodicWave(PULSE);
+  o.frequency.value = o2.frequency.value = mtof(m); o2.detune.value = 9;
+  const lfo = AC.createOscillator(); lfo.frequency.value = 5.6;
+  const lg = AC.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(0, t + 0.18); lg.gain.linearRampToValueAtTime(28, t + 0.5);
+  lfo.connect(lg); lg.connect(o.detune); lg.connect(o2.detune);
+  const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 3400; f.Q.value = 1;
+  const gn = AC.createGain(), e = t + len;
+  gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(vol, t + 0.008);
+  gn.gain.setTargetAtTime(vol * 0.7, t + 0.01, 0.08); gn.gain.setTargetAtTime(0, e, 0.035);
+  o.connect(f); o2.connect(f); f.connect(gn); gn.connect(busR); gn.connect(delayIn);
+  for (const x of [o, o2, lfo]) { x.start(t); x.stop(e + 0.3); }
+}
+function kick(t, vol) {
+  if (!AC) return;
+  const o = AC.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(170, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.13);
+  const gn = AC.createGain(); gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+  o.connect(gn); gn.connect(busC); o.start(t); o.stop(t + 0.34);
+}
+function snare(t, vol) {
+  if (!AC) return;
+  const n = AC.createBufferSource(); n.buffer = NOISE;
+  const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 0.7;
+  const gn = AC.createGain(); gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+  n.connect(f); f.connect(gn); gn.connect(busC); n.start(t, Math.random() * 0.5, 0.21);
+  const o = AC.createOscillator(); o.type = 'triangle';
+  o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(150, t + 0.08);
+  const g2 = AC.createGain(); g2.gain.setValueAtTime(vol * 0.9, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+  o.connect(g2); g2.connect(busC); o.start(t); o.stop(t + 0.1);
+}
+function hat(t, vol, open) {
+  if (!AC) return;
+  const n = AC.createBufferSource(); n.buffer = NOISE;
+  const f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7500;
+  const d = open ? 0.22 : 0.045;
+  const gn = AC.createGain(); gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(0.001, t + d);
+  n.connect(f); f.connect(gn); gn.connect(busR); n.start(t, Math.random() * 0.5, d + 0.02);
+}
+
+/* ---------------- the song ---------------- */
+function nm(s) { const m = s.match(/^([A-G])(#?)(\d)$/); return 12 * (+m[3] + 1) + { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0); }
+function parseBar(s) {
+  const tk = s.trim().split(/\s+/), out = new Array(16).fill(null);
+  for (let i = 0; i < 16; i++) { const x = tk[i]; if (x && x !== '-' && x !== '.') { let len = 1; while (i + len < 16 && tk[i + len] === '-') len++; out[i] = { n: nm(x), len }; } }
+  return out;
+}
+const MEL = [
+  ['E5 - - - A5 - - - G5 - E5 - D5 - C5 -', 'C5 - - - F5 - - - E5 - C5 - A4 - - -', 'G4 - C5 - E5 - G5 - - - E5 - G5 - A5 -', 'B5 - - - A5 - G5 - D5 - - - B4 - D5 -'],
+  ['A5 - - - C6 - B5 - A5 - G5 - E5 - - -', 'F5 - - - A5 - G5 - F5 - E5 - C5 - - -', 'E5 - G5 - C6 - - - B5 - G5 - E5 - G5 -', 'D6 - - - B5 - - - G5 - A5 - B5 - - -'],
+  ['A5 - - - - - - - C6 - - - A5 - - -', 'B5 - - - - - - - D6 - - - B5 - G5 -', 'G5 - - - - - - - B5 - - - E6 - - -', 'E6 - - - - - - - - - - - - - - -'],
+].map(p => p.map(parseBar));
+const CH = {
+  Am: { a: [69, 72, 76], b: 45 }, F: { a: [65, 69, 72], b: 41 }, C: { a: [67, 72, 76], b: 48 },
+  G: { a: [67, 71, 74], b: 43 }, Em: { a: [67, 71, 76], b: 40 },
+};
+const P1 = ['Am', 'F', 'C', 'G'], P2 = ['F', 'G', 'Em', 'Am'];
+const SONG = [
+  { ch: P1, cut: 700, cutUp: 1800, bass: 0, dr: 'none', mel: -1, sc: 'intro' },
+  { ch: P1, cut: 1800, bass: 1, dr: 'kick', mel: -1, sc: 'main' },
+  { ch: P1, cut: 4200, bass: 1, dr: 'break', mel: -1, sc: 'main', fill: 1 },
+  { ch: P1, cut: 4200, bass: 1, dr: 'break', mel: 0, sc: 'main' },
+  { ch: P1, cut: 4200, bass: 1, dr: 'break', mel: 1, sc: 'boing', fill: 1 },
+  { ch: P1, cut: 4200, bass: 1, dr: 'four', mel: 0, sc: 'boing' },
+  { ch: P2, cut: 2600, bass: 0, dr: 'none', mel: 2, sc: 'plasma' },
+  { ch: P2, cut: 3000, bass: 1, dr: 'build', mel: 2, sc: 'plasma' },
+  { ch: P1, cut: 5000, bass: 1, dr: 'four', mel: 0, sc: 'tunnel' },
+  { ch: P1, cut: 5000, bass: 1, dr: 'four', mel: 1, sc: 'tunnel', fill: 1 },
+  { ch: P1, cut: 4200, bass: 1, dr: 'break', mel: 0, sc: 'finale' },
+  { ch: P1, cut: 5000, bass: 1, dr: 'four', mel: 1, sc: 'finale', fill: 1 },
+  { ch: P1, cut: 1400, bass: 1, dr: 'hats', mel: -1, sc: 'end', fade: 1 },
+];
+const patIndex = ar => { const p = Math.floor(ar / 64); return p < SONG.length ? p : 2 + ((p - 2) % (SONG.length - 2)); };
+const BASSP = [0, null, 12, 0, null, 0, 12, null, 0, null, 12, 0, null, 0, 12, 7];
+function scheduleRow(ar, t) {
+  const pi = patIndex(ar), r = ar % 64, bar = r >> 4, st = r & 15, P = SONG[pi], C = CH[P.ch[bar]];
+  const fade = P.fade ? 1 - r / 64 * 0.8 : 1;
+  const ev = k => evQ.push({ t, k });
+  arp(t, C.a, 0.055 * fade, P.cut + (P.cutUp ? r / 64 * P.cutUp : 0));
+  if (P.bass) { const off = BASSP[st]; if (off !== null) bass(t, C.b + off, (BASSP[(st + 1) & 15] === null ? 2 : 1) * ROW * 0.92, 0.2 * fade); }
+  const dm = P.dr;
+  if (dm === 'kick') {
+    if (st === 0 || st === 8) { kick(t, 0.85); ev('kick'); }
+    if (st % 2 === 0) hat(t, st % 4 === 2 ? 0.1 : 0.06, false);
+  } else if (dm === 'hats') {
+    if (st % 2 === 0) hat(t, 0.08 * fade, st % 4 === 2);
+    if (st === 0) { kick(t, 0.6 * fade); ev('kick'); }
+  } else if (dm === 'break' || dm === 'four') {
+    const K = dm === 'break' ? [0, 7, 10] : [0, 4, 8, 12];
+    if (K.includes(st)) { kick(t, 0.85); ev('kick'); }
+    if (st === 4 || st === 12) { snare(t, 0.4); ev('snare'); }
+    if (st % 2 === 0) hat(t, st % 4 === 2 ? 0.12 : 0.07, st % 4 === 2 && dm === 'four');
+    else if (dm === 'break') hat(t, 0.035, false);
+    if (P.fill && bar === 3 && st >= 13) { snare(t, 0.25 + (st - 13) * 0.08); ev('snare'); }
+  } else if (dm === 'build') {
+    if (bar < 3) {
+      if (st === 0 || st === 8) { kick(t, 0.75); ev('kick'); }
+      if (st === 4 || st === 12) { snare(t, 0.3); ev('snare'); }
+      if (st % 2 === 0) hat(t, 0.08, false);
+    } else {
+      snare(t, 0.12 + st / 15 * 0.4); ev('snare');
+      if (st % 4 === 0) { kick(t, 0.7); ev('kick'); }
+    }
+  }
+  if (P.mel >= 0) { const n = MEL[P.mel][bar][st]; if (n) lead(t, n.n, n.len * ROW, 0.11 * fade); }
+}
+function sched() {
+  if (!AC) return;
+  const now = AC.currentTime;
+  if (nextRowT < now - 0.25) { absRow = Math.ceil((now - startT) / ROW); nextRowT = startT + absRow * ROW; }
+  while (nextRowT < now + 0.15) { scheduleRow(absRow, nextRowT); absRow++; nextRowT += ROW; }
+}
+// fallback clock (if WebAudio is unavailable the demo still runs, silently)
+let fbStart = 0;
+const clock = () => AC ? AC.currentTime : performance.now() / 1000 - fbStart;
+
+/* ================================================================
+   MAIN LOOP
+   ================================================================ */
+let state = 'title', last = performance.now() / 1000, kickP = 0, snP = 0, flash = 0, curScene = '', sceneStart = 0, silentRow = 0;
+function loop() {
+  requestAnimationFrame(loop);
+  const now = performance.now() / 1000; dt = Math.min(0.05, now - last); last = now;
+  if (state === 'title') { titleScreen(now); return; }
+  const at = clock();
+  if (!AC) { while (silentRow * ROW < at + 0.1) { scheduleRow(silentRow, silentRow * ROW); silentRow++; } }
+  while (evQ.length && evQ[0].t <= at) { const e = evQ.shift(); if (e.k === 'kick') kickP = 1; else if (e.k === 'snare') snP = 1; }
+  kickP *= Math.exp(-dt * 7); snP *= Math.exp(-dt * 6);
+  const songT = Math.max(0, at - startT), row = Math.floor(songT / ROW), sc = SONG[patIndex(row)].sc;
+  if (sc !== curScene) { if (curScene) flash = 0.9; curScene = sc; sceneStart = Math.floor(row / 64) * 64 * ROW; }
+  const T = songT - sceneStart;
+  switch (sc) {
+    case 'intro': introScene(T); break;
+    case 'main': mainScene(songT, songT); break;
+    case 'boing': boingScene(T, songT); break;
+    case 'plasma': plasmaScene(T, songT); break;
+    case 'tunnel': tunnelScene(T, songT); break;
+    case 'finale': finaleScene(songT, songT); break;
+    case 'end': endScene(T); break;
+  }
+  if (flash > 0.01) { g.fillStyle = `rgba(255,255,255,${flash})`; g.fillRect(0, 0, W, H); flash -= dt * 2.2; }
+}
+function start() {
+  if (state !== 'title') return;
+  initAudio();
+  if (AC) {
+    if (AC.resume) AC.resume().catch(() => {});
+    startT = AC.currentTime + 0.1; nextRowT = startT; absRow = 0;
+    setInterval(sched, 25); sched();
+  } else { fbStart = performance.now() / 1000; startT = 0.1; }
+  state = 'demo';
+}
+function toggleFS() {
+  try {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else { const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(() => {}); }
+  } catch (e) {}
+}
+addEventListener('pointerdown', start);
+addEventListener('dblclick', toggleFS);
+addEventListener('keydown', e => {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); start(); }
+  else if (e.key === 'f' || e.key === 'F') toggleFS();
+  else if ((e.key === 'm' || e.key === 'M') && AC) { muted = !muted; master.gain.setTargetAtTime(muted ? 0 : 0.7, AC.currentTime, 0.05); }
+});
+
+(async () => {
+  try { await Promise.race([document.fonts.load(`16px ${FONT}`), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+  buildGlyphs(SCROLL + BOING_WORDS.join('') + PLASMA_MSG.join('') + 'COPPER DREAMS');
+  buildLogo();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

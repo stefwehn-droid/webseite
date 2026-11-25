@@ -1,0 +1,9 @@
+# Vom Server erzeugt / Laufzeitdaten
+cache/
+counter.txt
+data/counter.txt
+
+# Composer-Abhängigkeiten (z. B. PHPMailer) und lokale Geheimnisse
+vendor/
+*.local.php
+.env

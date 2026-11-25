@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEURAL CORE – Raster Dreams · C64 Style Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=block" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:pointer}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  #scr{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 0 90px rgba(108,94,181,.25)}
+  #c{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;filter:contrast(1.05) saturate(1.1)}
+  #scr::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,0) calc(var(--lh,3px)*.5),rgba(0,0,0,.3) calc(var(--lh,3px)*.5),rgba(0,0,0,.3) var(--lh,3px))}
+  #scr::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+    background:radial-gradient(ellipse at center,rgba(0,0,0,0) 60%,rgba(0,0,0,.6) 100%)}
+  #hint{position:fixed;left:0;right:0;bottom:8px;text-align:center;font:8px "Press Start 2P",monospace;color:#555;letter-spacing:1px;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="scr"><canvas id="c"></canvas></div></div>
+<div id="hint">F: VOLLBILD &nbsp;·&nbsp; M: TON AN/AUS</div>
+<script>
+'use strict';
+/* ================================================================
+   NEURAL CORE – "RASTER DREAMS"   ·   C64 style
+   384x272 PAL frame incl. (open) borders · 16 fixed colours
+   3-voice SID-style synth rendered sample-by-sample (PWM, noise LFSR,
+   ADSR, resonant filter, 50 Hz arpeggios)
+   ================================================================ */
+const FW = 384, FH = 272, SX = 32, SY = 36, SW = 320, SH = 200, TAU = Math.PI * 2;
+const cv = document.getElementById('c'); cv.width = FW; cv.height = FH;
+const g = cv.getContext('2d', { alpha: false });
+const scr = document.getElementById('scr');
+const FONT = '"Press Start 2P", monospace';
+function fit() {
+  const iw = innerWidth, ih = innerHeight - 22, w = Math.min(iw, ih * 4 / 3), h = w * 3 / 4;
+  scr.style.width = w + 'px'; scr.style.height = h + 'px'; scr.style.setProperty('--lh', (h / FH) + 'px');
+}
+addEventListener('resize', fit); fit();
+
+/* ---------------- palette & framebuffer ---------------- */
+const PALC = [0x000000, 0xFFFFFF, 0x68372B, 0x70A4B2, 0x6F3D86, 0x588D43, 0x352879, 0xB8C76F,
+  0x6F4F25, 0x433900, 0x9A6759, 0x444444, 0x6C6C6C, 0x9AD284, 0x6C5EB5, 0x959595];
+const PAL = new Uint32Array(16);
+PALC.forEach((c, i) => PAL[i] = ((255 << 24) | ((c & 255) << 16) | (((c >> 8) & 255) << 8) | (c >> 16)) >>> 0);
+const FB = new Uint8Array(FW * FH);
+const img = g.createImageData(FW, FH), p32 = new Uint32Array(img.data.buffer);
+function present() { for (let i = 0; i < FB.length; i++) p32[i] = PAL[FB[i]]; g.putImageData(img, 0, 0); }
+const cls = c => FB.fill(c);
+function hl(y, c, x0 = 0, x1 = FW) { y |= 0; if (y < 0 || y >= FH) return; FB.fill(c, y * FW + Math.max(0, x0), y * FW + Math.min(FW, x1)); }
+function rect(x, y, w, h, c) { for (let j = 0; j < h; j++) hl(y + j, c, x, x + w); }
+function pset(x, y, c) { x |= 0; y |= 0; if (x >= 0 && x < FW && y >= 0 && y < FH) FB[y * FW + x] = c; }
+let CLIP = [0, 0, FW, FH];
+function chr(code, x, y, c, sx = 1, sy = 1) {
+  const b = FONTB[code]; if (!b) return;
+  x |= 0; y |= 0;
+  for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) if (b[j * 8 + i])
+    for (let v = 0; v < sy; v++) for (let u = 0; u < sx; u++) {
+      const px = x + i * sx + u, py = y + j * sy + v;
+      if (px >= CLIP[0] && px < CLIP[2] && py >= CLIP[1] && py < CLIP[3]) FB[py * FW + px] = c;
+    }
+}
+function text(s, x, y, c, sx = 1, sy = 1) {
+  if (x === 'c') x = ((FW - s.length * 8 * sx) / 2) | 0;
+  for (let i = 0; i < s.length; i++) chr(s.charCodeAt(i), x + i * 8 * sx, y, typeof c === 'function' ? c(i) : c, sx, sy);
+}
+const FONTB = {};
+function buildFont() {
+  const c = document.createElement('canvas'); c.width = 8; c.height = 8; const x = c.getContext('2d', { willReadFrequently: true });
+  for (let k = 32; k < 127; k++) {
+    x.clearRect(0, 0, 8, 8); x.font = `8px ${FONT}`; x.textBaseline = 'top'; x.fillStyle = '#fff'; x.fillText(String.fromCharCode(k), 0, 0);
+    const d = x.getImageData(0, 0, 8, 8).data, b = new Uint8Array(64);
+    for (let i = 0; i < 64; i++) b[i] = d[i * 4 + 3] > 100 ? 1 : 0;
+    FONTB[k] = b;
+  }
+}
+
+/* ---------------- colour ramps ---------------- */
+const R_BLUE = [6, 4, 14, 3, 13, 1, 13, 3, 14, 4, 6];
+const R_FIRE = [9, 2, 8, 10, 15, 7, 1, 7, 15, 10, 8, 2, 9];
+const R_GREY = [11, 12, 15, 1, 15, 12, 11];
+const R_GREEN = [9, 5, 13, 7, 1, 7, 13, 5, 9];
+const R_PURP = [6, 4, 10, 15, 1, 15, 10, 4, 6];
+const WASH = [11, 12, 15, 1, 1, 15, 12, 11, 6, 4, 14, 3, 13, 1, 13, 3, 14, 4, 6, 9, 2, 8, 10, 7, 1, 7, 10, 8, 2, 9];
+function bar(cy, ramp, x0 = 0, x1 = FW) { const h = ramp.length; for (let k = 0; k < h; k++) hl(cy - (h >> 1) + k, ramp[k], x0, x1); }
+
+/* ---------------- texts ---------------- */
+const SCROLL = 'HEY C64-SZENE!   NEURAL CORE IST ZURUECK MIT  RASTER DREAMS  ...   ALLES IN 16 FESTEN FARBEN, 384 X 272 PIXEL ' +
+  'INKLUSIVE RAHMEN - UND DIE RAHMEN SIND NATUERLICH OFFEN! ...   DIE MUSIK: DREI SID-STIMMEN MIT PULSBREITENMODULATION, ' +
+  'RESONANZFILTER UND ARPEGGIOS IM 50-HZ-TAKT, SAMPLE FUER SAMPLE IM BROWSER BERECHNET ...   EFFEKTE: RASTERBARS, TECH-TECH, ' +
+  'DYCP, CHAR-PLASMA, CHUNKY-ROTOZOOMER UND EIN SPRITE-MULTIPLEXER ...   CODE, GRAFIK UND MUSIK: CLAUDE ...   ' +
+  'GRUESSE AN ALLE, DIE NOCH WISSEN, WAS POKE 53280,0 MACHT! ...   ABSTIMMEN NICHT VERGESSEN!  ;-)   ...   ';
+const BORDER_TXT = '*** BORDER OPENED *** SPRITES IM RAHMEN *** 50 FPS *** 3 STIMMEN *** 16 FARBEN *** 64 KB ARE ENOUGH FOR EVERYONE ';
+const PLASMA_MSG = ['3 STIMMEN.', '16 FARBEN.', '64 KB.', 'NO LIMITS.'];
+const CREDITS = ['RASTER DREAMS', '', 'A NEURAL CORE PRODUCTION', '', '', 'CODE ......... CLAUDE', 'GRAFIK ....... CLAUDE',
+  'MUSIK ........ CLAUDE', '', '', 'SID: 3 STIMMEN', 'PULS, SAEGE, DREIECK, RAUSCHEN', 'TIEFPASS MIT RESONANZ', '', '',
+  'GRUESSE AN', 'ALLE CODER', 'ALLE PIXLER', 'ALLE MUSIKER', 'ALLE SWAPPER', '', '', 'DANKE FUERS ZUSCHAUEN!', '', 'READY.'];
+
+/* ---------------- multicolour logo ---------------- */
+let LOGO = null, LOGOW = 0, LOGOH = 0;
+function buildLogo() {
+  const lines = ['NEURAL', 'CORE'], ramps = [[1, 1, 7, 7, 7, 15, 10, 10, 8, 8, 2, 9], [1, 1, 13, 13, 3, 3, 14, 14, 4, 4, 6, 6]];
+  const BX = 6, BY = 3; LOGOW = 6 * 8 * BX + 8; LOGOH = 2 * (8 * BY + 4) + 4;
+  LOGO = new Uint8Array(LOGOW * LOGOH);
+  const put = (x, y, c) => { if (x >= 0 && x < LOGOW && y >= 0 && y < LOGOH) LOGO[y * LOGOW + x] = c; };
+  for (const pass of [0, 1]) lines.forEach((s, li) => {
+    const ox = ((6 - s.length) * 8 * BX) / 2, oy = li * (8 * BY + 4);
+    for (let ci = 0; ci < s.length; ci++) {
+      const b = FONTB[s.charCodeAt(ci)];
+      for (let fy = 0; fy < 8; fy++) for (let fx = 0; fx < 8; fx++) if (b[fy * 8 + fx])
+        for (let v = 0; v < BY; v++) for (let u = 0; u < BX; u++) {
+          const x = ox + ci * 8 * BX + fx * BX + u, y = oy + fy * BY + v;
+          if (pass === 0) { put(x + 4, y + 3, 11); }
+          else { const r = ramps[li]; put(x, y, r[Math.min(r.length - 1, ((fy * BY + v) * r.length / (8 * BY)) | 0)]); }
+        }
+    }
+  });
+}
+function drawLogo(t, y0, amp) {
+  const x0 = ((FW - LOGOW) / 2) | 0;
+  for (let y = 0; y < LOGOH; y++) {
+    const yy = y0 + y; if (yy < 0 || yy >= FH) continue;
+    const off = Math.round(Math.sin(y * 0.13 + t * 4) * amp + Math.sin(t * 1.1) * 10) * 2;
+    const row = y * LOGOW, fb = yy * FW;
+    for (let x = 0; x < LOGOW; x++) { const c = LOGO[row + x]; if (c) { const px = x0 + x + off; if (px >= 0 && px < FW) FB[fb + px] = c; } }
+  }
+}
+
+/* ---------------- sprites ---------------- */
+const SPR = new Uint8Array(24 * 21);
+for (let y = 0; y < 21; y++) for (let mx = 0; mx < 12; mx++) {
+  const dx = (mx * 2 + 1 - 12) / 12, dy = (y + 0.5 - 10.5) / 10.5, d = dx * dx + dy * dy;
+  let c = 0;
+  if (d <= 1) { const nz = Math.sqrt(1 - d), l = -0.5 * dx - 0.55 * dy + 0.67 * nz; c = l > 0.82 ? 1 : l > 0.2 ? 255 : 11; }
+  SPR[y * 24 + mx * 2] = SPR[y * 24 + mx * 2 + 1] = c;
+}
+function sprite(x, y, col) {
+  x |= 0; y |= 0;
+  for (let j = 0; j < 21; j++) for (let i = 0; i < 24; i++) { const c = SPR[j * 24 + i]; if (c) pset(x + i, y + j, c === 255 ? col : c); }
+}
+const SPCOL = [2, 5, 7, 4, 3, 10, 13, 14, 8, 15];
+
+/* ---------------- shared effects ---------------- */
+let dt = 0, kickP = 0, snP = 0;
+const PSTARS = Array.from({ length: 90 }, () => ({ x: Math.random() * FW, y: (Math.random() * FH) | 0, s: 1 + ((Math.random() * 3) | 0) }));
+function pstars(x0, y0, x1, y1, spd) {
+  for (const s of PSTARS) {
+    s.x -= s.s * spd * dt * 60; if (s.x < 0) { s.x += FW; s.y = (Math.random() * FH) | 0; }
+    if (s.y >= y0 && s.y < y1 && s.x >= x0 && s.x < x1) pset(s.x, s.y, [0, 11, 12, 1][s.s]);
+  }
+}
+function dycp(t, base, amp, sc) {
+  CLIP = [SX, SY, SX + SW, SY + SH];
+  const cw = 8 * sc, pos = (t * 70) % (SCROLL.length * cw + SW);
+  for (let i = 0; i < SCROLL.length; i++) {
+    const x = SX + SW + i * cw - pos; if (x > SX + SW) break; if (x < SX - cw) continue;
+    const y = base + Math.sin(x * 0.04 + t * 2.6) * amp;
+    const c = WASH[(((i * 2 - t * 18) % WASH.length) + WASH.length) % WASH.length | 0];
+    if (SCROLL[i] !== ' ') { chr(SCROLL.charCodeAt(i), x + sc, y + sc, 0, sc, sc); chr(SCROLL.charCodeAt(i), x, y, c, sc, sc); }
+  }
+  CLIP = [0, 0, FW, FH];
+}
+function borderScroll(t, y) {
+  const pos = (t * 90) % (BORDER_TXT.length * 8 + FW);
+  for (let i = 0; i < BORDER_TXT.length; i++) {
+    const x = FW + i * 8 - pos; if (x > FW) break; if (x < -8) continue;
+    chr(BORDER_TXT.charCodeAt(i), x, y, WASH[((i + (t * 25 | 0)) % WASH.length)]);
+  }
+}
+function rasterBars(t, n, ramps, cy, amp, spd = 1.7) {
+  for (let i = n - 1; i >= 0; i--) bar(cy + Math.sin(t * spd + i * 0.7) * amp, ramps[i % ramps.length]);
+}
+
+/* ---------------- scenes ---------------- */
+const HEAD0 = '    **** NEURAL CORE OS 64 ****', HEAD1 = '  64K RAM  -  1 SID  -  16 FARBEN';
+function blueScreen(lines, cur, blink) {
+  cls(14); rect(SX, SY, SW, SH, 6);
+  lines.forEach((l, i) => text(l, SX, SY + i * 8, 14));
+  if (cur && blink) rect(SX + cur[1] * 8, SY + cur[0] * 8, 8, 8, 14);
+}
+function titleScene(t) {
+  blueScreen([HEAD0, '', HEAD1, '', 'READY.', '', '', '', '', 'KLICK ODER LEERTASTE ZUM STARTEN'], [5, 0], (t * 2.5 | 0) % 2);
+}
+function bootScene(T) {
+  const L = [HEAD0, '', HEAD1, '', 'READY.'], cmd = 'LOAD"RASTER DREAMS",8,1';
+  const blink = (T * 2.5 | 0) % 2;
+  if (T < 0.35) return blueScreen(L, [5, 0], blink);
+  if (T < 2.9) {
+    const n = Math.min(cmd.length, ((T - 0.35) * 14) | 0); L.push(cmd.slice(0, n));
+    if (T > 2.1) { L.push('', 'SEARCHING FOR RASTER DREAMS'); }
+    if (T > 2.55) L.push('LOADING');
+    return blueScreen(L, n < cmd.length ? [5, n] : null, 1);
+  }
+  if (T < 5.3) {
+    let seed = (T * 50) | 0; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    for (let y = 0; y < FH;) { const h = 1 + ((rnd() * 6) | 0); rect(0, y, FW, h, (rnd() * 16) | 0); y += h; }
+    return;
+  }
+  if (T < 6.4) {
+    L.push(cmd, '', 'SEARCHING FOR RASTER DREAMS', 'LOADING', 'READY.');
+    const r = 'RUN', n = Math.min(3, Math.max(0, ((T - 5.5) * 8) | 0)); L.push(r.slice(0, n));
+    return blueScreen(L, [L.length - 1, n], blink);
+  }
+  cls(0);
+}
+function mainScene(t) {
+  cls(snP > 0.75 ? 11 : 0);
+  rect(SX, SY, SW, SH, 0);
+  rasterBars(t, 5, [R_BLUE, R_FIRE, R_GREEN, R_PURP, R_GREY], 136, 96);
+  pstars(SX, SY + 70, SX + SW, SY + SH, 1);
+  drawLogo(t, SY + 4 + Math.round(kickP * 8), 3 + snP * 4);
+  dycp(t, SY + 128, 22, 2);
+  hl(SY + SH + 4, 11); hl(SY + SH + 24, 11);
+  borderScroll(t, SY + SH + 12);
+}
+const BAY = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22,
+  3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
+const CR = [0, 6, 4, 14, 3, 13, 7, 1, 7, 13, 3, 14, 4, 6];
+function plasmaScene(T, t) {
+  cls(0);
+  for (let y = 0; y < FH; y++) { const k = ((y + t * 60) / 6 | 0) % R_PURP.length; if (y < SY || y >= SY + SH) hl(y, R_PURP[k]); else { hl(y, R_PURP[k], 0, SX); hl(y, R_PURP[k], SX + SW, FW); } }
+  for (let cy = 0; cy < 25; cy++) for (let cx = 0; cx < 40; cx++) {
+    const v = Math.sin(cx * 0.3 + t) + Math.sin(cy * 0.27 - t * 1.3) + Math.sin((cx + cy) * 0.17 + t * 0.7) + Math.sin(Math.hypot(cx - 20, cy - 12.5) * 0.45 - t * 1.6);
+    let lv = ((v + 4) / 8 * 112 + t * 30) % 112; if (lv < 0) lv += 112;
+    const ci = (lv >> 3) % 14, d = lv & 7, fg = CR[(ci + 1) % 14], bg = CR[ci], th = d * 8 + 4;
+    const bx = SX + cx * 8, by = SY + cy * 8;
+    for (let j = 0; j < 8; j++) { const o = (by + j) * FW + bx; for (let i = 0; i < 8; i++) FB[o + i] = BAY[j * 8 + i] < th ? fg : bg; }
+  }
+  const bi = Math.floor(T / 1.92), msg = PLASMA_MSG[bi % 4], n = Math.min(msg.length, ((T - bi * 1.92) * 14) | 0);
+  rect(SX, SY + 84, SW, 32, 0); hl(SY + 84, 1); hl(SY + 115, 1);
+  const s = msg.slice(0, n), x = ((FW - msg.length * 16) / 2) | 0;
+  text(s, x + 2, SY + 94, 11, 2, 2); text(s, x, SY + 92, i => WASH[(i * 2 + (t * 20 | 0)) % WASH.length], 2, 2);
+  borderScroll(t, SY + SH + 12);
+}
+const TEX = new Uint8Array(32 * 32);
+for (let v = 0; v < 32; v++) for (let u = 0; u < 32; u++) {
+  const ring = Math.min(5, (Math.hypot((u & 15) - 7.5, (v & 15) - 7.5) / 1.6) | 0), ch = ((u >> 4) ^ (v >> 4)) & 1;
+  TEX[v * 32 + u] = (ch ? [1, 7, 10, 8, 2, 9] : [1, 3, 14, 4, 6, 0])[ring];
+}
+function rotoScene(T, t) {
+  for (let y = 0; y < FH; y++) hl(y, R_FIRE[(((y >> 2) + (t * 12 | 0)) % R_FIRE.length)]);
+  if (kickP > 0.8) cls(1);
+  const a = t * 0.6, z = 0.26 + 0.16 * Math.sin(t * 0.7), ca = Math.cos(a) * z, sa = Math.sin(a) * z;
+  const ou = Math.sin(t * 0.5) * 20, ov = t * 6;
+  for (let cy = 0; cy < 50; cy++) for (let cx = 0; cx < 80; cx++) {
+    const x = cx - 40, y = cy - 25;
+    const u = ((x * ca - y * sa) * 4 + ou) & 31, v = ((x * sa + y * ca) * 4 + ov) & 31;
+    const c = TEX[v * 32 + u], bx = SX + cx * 4, by = SY + cy * 4;
+    for (let j = 0; j < 4; j++) FB.fill(c, (by + j) * FW + bx, (by + j) * FW + bx + 4);
+  }
+  rect(SX, SY + SH - 22, SW, 14, 0);
+  text('CHUNKY ROTOZOOM  4X4', 'c', SY + SH - 19, i => WASH[(i + (t * 20 | 0)) % WASH.length]);
+  borderScroll(t, SY + SH + 12);
+}
+function spriteScene(T, t) {
+  cls(0);
+  pstars(0, 0, FW, FH, 2);
+  for (let i = 0; i < 4; i++) bar(SY + 100 + Math.sin(t * 2 + i) * 18, [R_BLUE, R_PURP][i & 1]);
+  const s = 'NO BORDERS!', sc = 3;
+  text(s, ((FW - s.length * 8 * sc) / 2) + 3, SY + 89 + 3, 0, sc, sc);
+  text(s, ((FW - s.length * 8 * sc) / 2) | 0, SY + 89, i => WASH[(i * 3 + (t * 22 | 0)) % WASH.length], sc, sc);
+  const n = 32, puls = 1 + kickP * 0.08;
+  for (let i = 0; i < n; i++) {
+    const a = t * 0.9 + i * TAU / n;
+    const x = FW / 2 + Math.sin(a * 2) * 175 * puls - 12, y = FH / 2 + Math.sin(a * 3 + t * 0.4) * 122 * puls - 10;
+    sprite(x, y, SPCOL[i % SPCOL.length]);
+  }
+  borderScroll(t, FH - 12);
+}
+function finaleScene(t) {
+  cls(snP > 0.75 ? 6 : 0);
+  rasterBars(t, 6, [R_FIRE, R_BLUE, R_GREEN, R_PURP], 136, 110, 2.1);
+  rect(SX, SY + 58, SW, 92, 0);
+  pstars(SX, SY + 58, SX + SW, SY + 150, 1.6);
+  drawLogo(t, SY + 2 + Math.round(kickP * 6), 4 + snP * 4);
+  const n = 16, r = 58 + kickP * 10;
+  for (let i = 0; i < n; i++) {
+    const a = t * 1.4 + i * TAU / n;
+    sprite(FW / 2 + Math.cos(a) * r * 1.9 - 12, SY + 104 + Math.sin(a) * r * 0.62 - 10, SPCOL[(i + (t * 4 | 0)) % SPCOL.length]);
+  }
+  dycp(t, SY + 160, 14, 2);
+  borderScroll(t, SY + SH + 12);
+}
+function endScene(T, t) {
+  cls(0);
+  for (let y = 0; y < FH; y++) if (y < SY || y >= SY + SH) hl(y, R_BLUE[(((y >> 3) + (t * 5 | 0)) % R_BLUE.length)]);
+  CLIP = [SX, SY, SX + SW, SY + SH];
+  CREDITS.forEach((l, i) => {
+    const y = SY + SH - T * 26 + i * 12 + 10;
+    if (y < SY - 16 || y > SY + SH) return;
+    if (i === 0) { text(l, 'c', y - 4, i2 => WASH[(i2 * 2 + (t * 20 | 0)) % WASH.length], 2, 2); return; }
+    text(l, 'c', y, i2 => WASH[(i2 + i * 3 + (t * 15 | 0)) % WASH.length]);
+  });
+  CLIP = [0, 0, FW, FH];
+}
+
+/* ================================================================
+   SID-STYLE SYNTH  (offline render, 50 Hz player ticks)
+   ================================================================ */
+const SR = 44100, TPS = 50, SPT = SR / TPS, TPR = 6, ROW = TPR / TPS;
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function nm(s) { const m = s.match(/^([A-G])(#?)(\d)$/); return 12 * (+m[3] + 1) + { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0); }
+function parseBar(s) {
+  const tk = s.trim().split(/\s+/), out = new Array(16).fill(null);
+  for (let i = 0; i < 16; i++) { const x = tk[i]; if (x && x !== '-') { let len = 1; while (i + len < 16 && tk[i + len] === '-') len++; out[i] = { n: nm(x), len }; } }
+  return out;
+}
+const MEL = [
+  ['B4 - - - E5 - - - G5 - F#5 - E5 - D5 -', 'E5 - - - G5 - - - C6 - B5 - G5 - E5 -', 'F#5 - - - A5 - - - D6 - C6 - A5 - F#5 -', 'D#5 - - - F#5 - - - B5 - - - A5 - - -'],
+  ['E6 - - - D6 - B5 - G5 - - - B5 - E6 -', 'G6 - - - E6 - - - C6 - - - E6 - G6 -', 'F#6 - - - D6 - - - A5 - B5 - C6 - D6 -', 'D#6 - - - - - - - B5 - - - - - - -'],
+  ['C6 - - - - - - - B5 - - - A5 - - -', 'G5 - - - - - - - B5 - - - E6 - - -', 'E6 - - - - - - - G6 - - - E6 - - -', 'D#6 - - - - - - - F#6 - - - - - - -'],
+].map(p => p.map(parseBar));
+const CH = {
+  Em: { r: 40, a: [64, 67, 71] }, C: { r: 36, a: [60, 64, 67] }, D: { r: 38, a: [62, 66, 69] },
+  B: { r: 35, a: [59, 63, 66] }, Am: { r: 45, a: [57, 60, 64] },
+};
+const PA = ['Em', 'C', 'D', 'B'], PB = ['Am', 'Em', 'C', 'B'];
+const SONG = [
+  { ch: PA, bass: 0, mel: -1, v2: 0, dr: 'none', f3: 1, fc: [140, 3800], sc: 'boot' },
+  { ch: PA, bass: 16, mel: -1, v2: 0, dr: 'kick', fc: [250, 1400], sc: 'main' },
+  { ch: PA, bass: 16, mel: -1, v2: 'stab', dr: 'beat', fc: [600, 2400], sc: 'main', fill: 1 },
+  { ch: PA, bass: 16, mel: 0, dr: 'beat', fc: [800, 2000], sc: 'main' },
+  { ch: PA, bass: 16, mel: 1, dr: 'beat', fc: [500, 3000], sc: 'plasma', fill: 1 },
+  { ch: PA, bass: 16, mel: 0, dr: 'four', fc: [900, 2600], sc: 'plasma' },
+  { ch: PB, bass: 'sus', mel: 2, dr: 'none', fc: [350, 1300], sc: 'roto' },
+  { ch: PB, bass: 16, mel: 2, dr: 'build', fc: [300, 4200], sc: 'roto' },
+  { ch: PA, bass: 16, mel: 0, dr: 'four', fc: [1200, 2600], sc: 'sprites' },
+  { ch: PA, bass: 16, mel: 1, dr: 'four', fc: [1200, 3200], sc: 'sprites', fill: 1 },
+  { ch: PA, bass: 16, mel: 0, dr: 'beat', fc: [800, 2400], sc: 'finale' },
+  { ch: PA, bass: 16, mel: 1, dr: 'four', fc: [1500, 3600], sc: 'finale', fill: 1 },
+  { ch: PA, bass: 16, mel: -1, v2: 'stab', dr: 'kick', fc: [1600, 180], sc: 'end', fade: 1 },
+];
+const LOOP_S = 2 * 64 * ROW, LOOP_E = SONG.length * 64 * ROW;
+const BASSP = [0, 0, 12, 0, 0, 12, 0, 12, 0, 0, 12, 0, 7, 12, 0, 12];
+// waves: 1 pulse 2 saw 3 tri 4 noise
+const INST = {
+  bass: { w: 1, a: .002, d: .14, s: .4, r: .03, pwm: 'g', vol: .9 },
+  bassS: { w: 1, a: .01, d: .6, s: .7, r: .2, pwm: 'g', vol: .9 },
+  lead: { w: 1, a: .004, d: .3, s: .65, r: .12, pwm: 'n', vib: .32, vibD: 10, blip: 1, vol: .75 },
+  stab: { w: 2, a: .001, d: .09, s: 0, r: .04, arp: 1, vol: .5 },
+  arp: { w: 1, a: .001, d: .09, s: .45, r: .04, arp: 1, pw: .22, vol: .55 },
+  kick: { a: .001, d: .2, s: 0, r: .05, vol: 1, tab: [[4, 2600], [1, 190], [1, 140], [1, 105], [3, 82], [3, 66], [3, 54], [3, 46], [3, 42]] },
+  snare: { a: .001, d: .17, s: 0, r: .05, vol: .9, tab: [[4, 5200], [1, 250], [4, 4300], [4, 3900], [4, 3500], [4, 3200], [4, 3000], [4, 2800]] },
+  hat: { a: .001, d: .05, s: 0, r: .02, vol: .45, tab: [[4, 12000]] },
+};
+function drumAt(P, bar, st) {
+  const d = P.dr;
+  if (P.fill && bar === 3 && st >= 13) return ['snare', 0.6 + (st - 13) * 0.2];
+  if (d === 'kick') return (st === 0 || st === 8) ? ['kick', 1] : null;
+  if (d === 'beat') return [0, 6, 10].includes(st) ? ['kick', 1] : (st === 4 || st === 12) ? ['snare', 1] : null;
+  if (d === 'four') return [0, 3, 8, 11].includes(st) ? ['kick', 1] : (st === 4 || st === 12) ? ['snare', 1] : (st === 7 || st === 15) ? ['hat', 1] : null;
+  if (d === 'build') {
+    if (bar < 3) return [0, 6, 10].includes(st) ? ['kick', 1] : (st === 4 || st === 12) ? ['snare', 1] : null;
+    return st % 4 === 0 ? ['kick', 1] : ['snare', 0.35 + st / 15 * 0.65];
+  }
+  return null;
+}
+const EVENTS = [];
+let AUDIO = null, renderDone = false;
+function renderSong(onDone) {
+  const totalTicks = SONG.length * 64 * TPR, N = totalTicks * SPT, out = new Float32Array(N);
+  const V = [0, 1, 2].map(() => ({ ph: 0, f: 0, w: 0, pw: .5, env: 0, st: 0, atk: 0, s: 0, decK: 0, relK: 0, lfsr: 0x7ffff8, nv: 0, filt: 0, vol: 0 }));
+  const TR = [null, null, null];
+  let low = 0, band = 0, fc = 1000, tick = 0;
+  const blep = (t, d) => { if (t < d) { t /= d; return t + t - t * t - 1; } if (t > 1 - d) { t = (t - 1) / d; return t * t + t + t + 1; } return 0; };
+  function noteOn(v, name, note, gate, vol, notes) {
+    const I = INST[name]; TR[v] = { I, note, t: 0, gate, vol, notes };
+    const sv = V[v];
+    sv.env = 0; sv.st = 1; sv.atk = 1 / (I.a * SR); sv.s = I.s; sv.decK = Math.exp(-4 / (I.d * SR)); sv.relK = Math.exp(-4 / (I.r * SR));
+  }
+  function newRow(row) {
+    const P = SONG[row >> 6], r = row & 63, bar = r >> 4, st = r & 15, C = CH[P.ch[bar]], fade = P.fade ? 1 - r / 64 * 0.85 : 1, t = row * ROW;
+    if (P.bass === 16) noteOn(0, 'bass', C.r + BASSP[st], 4, fade);
+    else if (P.bass === 'sus' && (st === 0 || st === 8)) noteOn(0, 'bassS', C.r + (st === 8 ? 12 : 0), 8 * TPR - 1, fade);
+    if (P.mel >= 0) { const e = MEL[P.mel][bar][st]; if (e) noteOn(1, 'lead', e.n, e.len * TPR - 1, fade); }
+    else if (P.v2 === 'stab' && [0, 3, 6, 10, 12].includes(st)) noteOn(1, 'stab', 0, 2, fade, C.a.map(n => n + 12));
+    const d = drumAt(P, bar, st);
+    if (d) { noteOn(2, d[0], 0, 1, d[1] * fade); if (d[0] !== 'hat') EVENTS.push({ t, k: d[0] }); }
+    else noteOn(2, 'arp', 0, 5, fade * (P.dr === 'none' ? 1 : 0.85), C.a);
+  }
+  function control(tk) {
+    const row = Math.floor(tk / TPR), sub = tk % TPR;
+    if (sub === 0) newRow(row);
+    const P = SONG[row >> 6], frac = ((row & 63) + sub / TPR) / 64;
+    fc = P.fc[0] * Math.pow(P.fc[1] / P.fc[0], frac) * (1 + 0.15 * Math.sin(tk * 0.05));
+    for (let v = 0; v < 3; v++) {
+      const tr = TR[v], sv = V[v]; if (!tr) continue;
+      const I = tr.I;
+      if (tr.t === tr.gate) sv.st = 3;
+      if (I.tab) { const e = I.tab[Math.min(tr.t, I.tab.length - 1)]; sv.w = e[0]; sv.f = e[1]; sv.pw = .5; }
+      else {
+        let n = I.arp ? tr.notes[tr.t % 3] : tr.note;
+        if (I.blip && tr.t === 0) n += 12;
+        if (I.vib && tr.t > I.vibD) n += Math.sin((tr.t - I.vibD) * 0.7) * I.vib * Math.min(1, (tr.t - I.vibD) / 12);
+        sv.f = mtof(n); sv.w = I.w;
+        sv.pw = I.pwm === 'g' ? 0.5 - 0.42 * Math.cos(tk * 0.045) : I.pwm === 'n' ? 0.5 - 0.38 * Math.cos(tr.t * 0.09) : (I.pw || .5);
+      }
+      sv.vol = tr.vol * I.vol;
+      sv.filt = v === 0 || (v === 2 && P.f3) ? 1 : 0;
+      tr.t++;
+    }
+  }
+  function synth(off) {
+    const fcc = Math.min(6000, Math.max(60, fc)), F = 2 * Math.sin(Math.PI * fcc / SR), Q = 0.35;
+    for (let i = 0; i < SPT; i++) {
+      let fs = 0, ds = 0;
+      for (let v = 0; v < 3; v++) {
+        const s = V[v]; if (!s.w) continue;
+        if (s.st === 1) { s.env += s.atk; if (s.env >= 1) { s.env = 1; s.st = 2; } }
+        else if (s.st === 2) s.env = s.s + (s.env - s.s) * s.decK;
+        else if (s.st === 3) s.env *= s.relK;
+        if (s.env < 1e-5 && s.st === 3) continue;
+        const d = s.f / SR; s.ph += d;
+        if (s.ph >= 1) { s.ph -= 1; if (s.w === 4) { const b = ((s.lfsr >> 22) ^ (s.lfsr >> 17)) & 1; s.lfsr = ((s.lfsr << 1) | b) & 0x7fffff; s.nv = ((s.lfsr >> 11) & 255) / 127.5 - 1; } }
+        let w;
+        if (s.w === 1) { w = (s.ph < s.pw ? 1 : -1) + blep(s.ph, d) - blep((s.ph - s.pw + 1) % 1, d); }
+        else if (s.w === 2) w = 2 * s.ph - 1 - blep(s.ph, d);
+        else if (s.w === 3) w = 1 - 4 * Math.abs(s.ph - 0.5);
+        else w = s.nv;
+        const val = w * s.env * s.vol;
+        if (s.filt) fs += val; else ds += val;
+      }
+      low += F * band; const high = fs - low - Q * band; band += F * high;
+      out[off + i] = (low * 1.1 + ds) * 0.3;
+    }
+  }
+  function step() {
+    const end = Math.min(totalTicks, tick + 300);
+    for (; tick < end; tick++) { control(tick); synth(tick * SPT); }
+    if (tick < totalTicks) setTimeout(step, 0);
+    else {
+      let pk = 0, dc = 0; for (let i = 0; i < N; i++) { dc += (out[i] - dc) * 0.0005; out[i] -= dc; const a = Math.abs(out[i]); if (a > pk) pk = a; }
+      const k = 0.92 / (pk || 1); for (let i = 0; i < N; i++) out[i] *= k;
+      onDone(out);
+    }
+  }
+  step();
+}
+
+/* ---------------- playback & loop ---------------- */
+let AC = null, master = null, startT = 0, state = 'title', pending = false, muted = false, fbT0 = 0;
+function clockSong() {
+  if (state !== 'demo') return 0;
+  let t = (AC ? AC.currentTime : performance.now() / 1000) - startT - (AC ? 0 : fbT0);
+  if (t < 0) t = 0;
+  if (t >= LOOP_E) t = LOOP_S + (t - LOOP_S) % (LOOP_E - LOOP_S);
+  return t;
+}
+function play() {
+  if (AC && AUDIO) {
+    const buf = AC.createBuffer(1, AUDIO.length, SR); buf.getChannelData(0).set(AUDIO);
+    const src = AC.createBufferSource(); src.buffer = buf; src.loop = true; src.loopStart = LOOP_S; src.loopEnd = LOOP_E;
+    master = AC.createGain(); master.gain.value = muted ? 0 : 0.9;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 9000;
+    src.connect(lp); lp.connect(master); master.connect(AC.destination);
+    startT = AC.currentTime + 0.08; src.start(startT);
+  } else { fbT0 = performance.now() / 1000; startT = 0; }
+  state = 'demo';
+}
+function start() {
+  if (state !== 'title') return;
+  try { AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.resume) AC.resume().catch(() => {}); } catch (e) { AC = null; }
+  if (renderDone) play(); else { pending = true; state = 'wait'; }
+}
+
+/* ---------------- main loop ---------------- */
+let last = performance.now() / 1000, curScene = '', sceneStart = 0, flash = 0, prevT = 0, evp = 0;
+function loop() {
+  requestAnimationFrame(loop);
+  const now = performance.now() / 1000; dt = Math.min(0.05, now - last); last = now;
+  if (state === 'title' || state === 'wait') { titleScene(now); if (state === 'wait') text('  BITTE WARTEN...', SX, SY + 13 * 8, 14); present(); return; }
+  const t = clockSong();
+  if (t < prevT) evp = EVENTS.findIndex(e => e.t >= LOOP_S);
+  prevT = t;
+  while (evp >= 0 && evp < EVENTS.length && EVENTS[evp].t <= t) { if (EVENTS[evp].k === 'kick') kickP = 1; else snP = 1; evp++; }
+  kickP *= Math.exp(-dt * 7); snP *= Math.exp(-dt * 6);
+  const row = Math.floor(t / ROW), sc = SONG[Math.min(SONG.length - 1, row >> 6)].sc;
+  if (sc !== curScene) { if (curScene && curScene !== 'boot') flash = 1; curScene = sc; sceneStart = (row >> 6) * 64 * ROW; }
+  const T = t - sceneStart;
+  switch (sc) {
+    case 'boot': bootScene(T); break;
+    case 'main': mainScene(t); break;
+    case 'plasma': plasmaScene(T, t); break;
+    case 'roto': rotoScene(T, t); break;
+    case 'sprites': spriteScene(T, t); break;
+    case 'finale': finaleScene(t); break;
+    case 'end': endScene(T, t); break;
+  }
+  if (flash > 0) { cls([0, 11, 12, 15, 1][Math.min(4, (flash * 5) | 0)]); flash -= dt * 5; }
+  present();
+}
+function toggleFS() {
+  try { if (document.fullscreenElement) document.exitFullscreen(); else { const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(() => {}); } } catch (e) {}
+}
+addEventListener('pointerdown', start);
+addEventListener('dblclick', toggleFS);
+addEventListener('keydown', e => {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); start(); }
+  else if (e.key === 'f' || e.key === 'F') toggleFS();
+  else if ((e.key === 'm' || e.key === 'M')) { muted = !muted; if (master && AC) master.gain.setTargetAtTime(muted ? 0 : 0.9, AC.currentTime, 0.05); }
+});
+(async () => {
+  try { await Promise.race([document.fonts.load(`8px ${FONT}`), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+  buildFont(); buildLogo();
+  requestAnimationFrame(loop);
+  renderSong(out => { AUDIO = out; renderDone = true; if (pending) play(); });
+})();
+</script>
+</body>
+</html>

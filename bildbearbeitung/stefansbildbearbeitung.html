@@ -1,0 +1,1484 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stefans Bildbearbeitung</title>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+
+<style>
+:root{
+  --bg:#11141c;
+  --panel:#1b2130;
+  --panel2:#252e40;
+  --border:#354158;
+  --text:#f2f5fb;
+  --muted:#9ba8bd;
+  --accent:#927dff;
+  --accent2:#55d9c0;
+  --danger:#ff718b;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:radial-gradient(ellipse at 15% 0%,#29234b 0,transparent 38%),var(--bg);
+  color:var(--text);
+  font:14px Arial,sans-serif;
+  min-height:100vh;
+}
+header{
+  height:68px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 22px;
+  background:#151a25;
+  border-bottom:1px solid var(--border);
+  position:sticky;
+  top:0;
+  z-index:5;
+}
+.brand{font-size:20px;font-weight:800;letter-spacing:-.4px}
+.brand span{color:var(--accent)}
+.header-right{display:flex;gap:8px;align-items:center}
+.badge{
+  color:#7ce6c7;
+  border:1px solid #55d9c044;
+  background:#55d9c010;
+  border-radius:30px;
+  padding:7px 11px;
+  font-size:11px;
+}
+button,.file-label,select{
+  background:var(--panel2);
+  color:var(--text);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:9px 12px;
+  cursor:pointer;
+  font:inherit;
+}
+button:hover,.file-label:hover{border-color:var(--accent);color:#c5baff}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{
+  background:#705be0;
+  border-color:#705be0;
+  color:white;
+  font-weight:bold;
+}
+button.success{
+  background:#167e69;
+  border-color:#167e69;
+  color:white;
+}
+button.active{border-color:var(--accent);color:#c5baff}
+input[type=file]{display:none}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=number]{width:75px}
+.app{
+  display:grid;
+  grid-template-columns:245px minmax(0,1fr) 275px;
+  min-height:calc(100vh - 68px);
+}
+.sidebar,.rightbar{
+  background:var(--panel);
+  padding:15px;
+  overflow-y:auto;
+}
+.sidebar{border-right:1px solid var(--border)}
+.rightbar{border-left:1px solid var(--border)}
+.workspace{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  background:#10131a;
+}
+.toolbar{
+  min-height:48px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:7px;
+  padding:7px;
+  background:#191f2b;
+  border-bottom:1px solid var(--border);
+}
+.stage{
+  flex:1;
+  min-height:500px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:25px;
+  overflow:auto;
+  position:relative;
+}
+.canvas-wrap{
+  display:none;
+  position:relative;
+  line-height:0;
+  box-shadow:0 12px 50px #0009;
+}
+#photoCanvas{display:block;max-width:100%}
+#maskCanvas{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  cursor:crosshair;
+  touch-action:none;
+}
+.empty{
+  text-align:center;
+  color:var(--muted);
+  max-width:400px;
+  line-height:1.7;
+}
+.empty .symbol{font-size:55px;margin-bottom:15px}
+.section{
+  border-bottom:1px solid var(--border);
+  padding:12px 0;
+}
+.section-title{
+  font-size:11px;
+  color:#b4a8ff;
+  font-weight:800;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  margin-bottom:12px;
+}
+.control{margin:12px 0}
+.control-head{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:7px;
+  color:#d5dbea;
+  font-size:12px;
+}
+.control-head output{color:var(--accent2)}
+.row{display:flex;gap:7px;flex-wrap:wrap}
+.row button{flex:1}
+.wide{width:100%}
+.small{
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.55;
+}
+.status{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5;
+  overflow-wrap:anywhere;
+}
+.model-status{
+  padding:10px;
+  border-radius:8px;
+  background:#111a27;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.5;
+  margin:10px 0;
+}
+.model-status.ready{color:#72e3bc}
+
+/* Neuer, gestalteter Button für das lokale KI-Modell */
+.model-upload{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  width:100%;
+  padding:12px;
+  margin-top:9px;
+  background:#171e2b;
+  border:1px dashed #59647e;
+  border-radius:10px;
+  cursor:pointer;
+  transition:all .2s ease;
+}
+.model-upload:hover{
+  background:#252b40;
+  border-color:#a18cff;
+  transform:translateY(-1px);
+}
+.model-upload-icon{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:36px;
+  height:36px;
+  flex-shrink:0;
+  border-radius:9px;
+  background:#927dff20;
+  font-size:18px;
+}
+.model-upload-text{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  flex:1;
+  min-width:0;
+}
+.model-upload-text strong{
+  font-size:12px;
+  color:#e8e5ff;
+}
+.model-upload-text small{
+  font-size:10px;
+  color:#9ba8bd;
+}
+.model-upload-arrow{
+  font-size:22px;
+  color:#a18cff;
+}
+#modelFile{display:none}
+
+.preset-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+.preset-grid button{font-size:12px}
+#busyOverlay,#aiOverlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:20;
+  align-items:center;
+  justify-content:center;
+  background:#070a10df;
+  backdrop-filter:blur(9px);
+}
+.modal{
+  width:min(440px,90vw);
+  background:#1a2231;
+  border:1px solid #48536d;
+  border-radius:20px;
+  padding:28px;
+  text-align:center;
+  box-shadow:0 25px 90px #0009;
+}
+.spinner{
+  width:55px;height:55px;
+  border:4px solid #ffffff20;
+  border-top-color:var(--accent);
+  border-right-color:var(--accent2);
+  border-radius:50%;
+  animation:spin 1s linear infinite;
+  margin:0 auto 20px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress{
+  height:7px;
+  background:#30394b;
+  border-radius:20px;
+  overflow:hidden;
+  margin:18px 0;
+}
+.progress div{
+  height:100%;
+  width:0;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  transition:width .3s;
+}
+.toast{
+  position:fixed;
+  bottom:22px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#263249;
+  border:1px solid var(--border);
+  padding:12px 18px;
+  border-radius:10px;
+  display:none;
+  z-index:30;
+  box-shadow:0 8px 30px #0008;
+}
+footer{
+  text-align:center;
+  padding:15px;
+  color:#66738a;
+  font-size:10px;
+  letter-spacing:2px;
+}
+@media(max-width:1000px){
+  .app{grid-template-columns:210px minmax(0,1fr)}
+  .rightbar{grid-column:1/-1;border-left:0;border-top:1px solid var(--border)}
+}
+@media(max-width:650px){
+  header{padding:0 12px}
+  .brand{font-size:16px}
+  .badge{display:none}
+  .app{display:flex;flex-direction:column}
+  .sidebar,.rightbar{overflow:visible}
+  .stage{min-height:350px;padding:12px}
+  .toolbar{justify-content:flex-start}
+}
+</style>
+</head>
+
+<body>
+<header>
+  <div class="brand">✦ <span>Stefans</span> Bildbearbeitung</div>
+  <div class="header-right">
+    <span class="badge">LOKALE BILDBEARBEITUNG</span>
+    <label class="file-label" for="fileInput">＋ Foto öffnen</label>
+    <input id="fileInput" type="file" accept="image/*,.heic,.heif">
+  </div>
+</header>
+
+<div class="app">
+<aside class="sidebar">
+
+  <div class="section">
+    <div class="section-title">Bild öffnen</div>
+    <label class="file-label wide" for="fileInput">📂 Bild auswählen</label>
+    <p class="small">Unterstützt JPG, PNG, WebP und HEIC/HEIF.</p>
+    <div id="imageInfo" class="status">Noch kein Bild geladen</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Objekte entfernen</div>
+
+    <button class="primary wide" id="loadModelButton">
+      ✨ KI-Modell laden
+    </button>
+
+    <label class="model-upload" for="modelFile">
+      <span class="model-upload-icon">📁</span>
+      <span class="model-upload-text">
+        <strong>Eigenes KI-Modell laden</strong>
+        <small>ONNX-Datei vom Computer auswählen</small>
+      </span>
+      <span class="model-upload-arrow">›</span>
+    </label>
+    <input id="modelFile" type="file" accept=".onnx">
+
+    <div id="modelStatus" class="model-status">
+      KI-Modell noch nicht geladen.
+    </div>
+
+    <div class="control">
+      <div class="control-head">
+        <span>Markierungspinsel</span>
+        <output id="brushValue">35 px</output>
+      </div>
+      <input id="brushSize" type="range" min="5" max="150" value="35">
+    </div>
+
+    <div class="row">
+      <button id="eraseBrush" class="active">Markieren</button>
+      <button id="restoreBrush">Radieren</button>
+    </div>
+
+    <div class="row" style="margin-top:7px">
+      <button id="clearMaskButton">Markierung löschen</button>
+      <button id="compareButton">Vorher / Nachher</button>
+    </div>
+
+    <button id="aiButton" class="primary wide" style="margin-top:9px" disabled>
+      ✨ Objekt mit KI entfernen
+    </button>
+
+    <button id="classicButton" class="wide" style="margin-top:7px" disabled>
+      Klassische Reparatur
+    </button>
+
+    <p class="small">
+      Die KI rekonstruiert markierte Bildbereiche. Die klassische Reparatur
+      arbeitet dagegen mit einer einfachen Interpolation benachbarter Pixel.
+    </p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Bildausrichtung</div>
+    <div class="row">
+      <button id="rotateLeft">↶ Drehen</button>
+      <button id="rotateRight">↷ Drehen</button>
+    </div>
+    <div class="row" style="margin-top:7px">
+      <button id="flipH">↔ Spiegeln</button>
+      <button id="flipV">↕ Spiegeln</button>
+    </div>
+    <button id="cropButton" class="wide" style="margin-top:7px">
+      Quadrat zuschneiden
+    </button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Ansicht</div>
+    <div class="row">
+      <button id="zoomOut">−</button>
+      <button id="fitButton">Einpassen</button>
+      <button id="zoomIn">＋</button>
+    </div>
+    <div class="control-head" style="margin-top:10px">
+      <span>Zoom</span><output id="zoomValue">100%</output>
+    </div>
+    <input id="zoomSlider" type="range" min="10" max="200" value="100">
+  </div>
+
+  <div class="section">
+    <div class="section-title">Verlauf</div>
+    <div class="row">
+      <button id="undoButton">↶ Rückgängig</button>
+      <button id="redoButton">↷ Wiederholen</button>
+    </div>
+    <button id="resetButton" class="wide" style="margin-top:7px">
+      Original wiederherstellen
+    </button>
+  </div>
+</aside>
+
+<main class="workspace">
+  <div class="toolbar">
+    <button id="beforeButton">Vorher</button>
+    <button id="afterButton" class="active">Nachher</button>
+    <button id="fitToolbar">Einpassen</button>
+    <button id="exportButton" class="success">↓ Exportieren</button>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="empty" id="empty">
+      <div class="symbol">🖼️</div>
+      <strong>Willkommen bei Stefans Bildbearbeitung</strong>
+      <p>Öffne ein Foto, um mit der Bearbeitung zu beginnen.</p>
+      <label class="file-label" for="fileInput">Foto auswählen</label>
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="photoCanvas"></canvas>
+      <canvas id="maskCanvas"></canvas>
+    </div>
+  </div>
+
+  <div style="padding:9px 14px;border-top:1px solid var(--border)" class="status" id="statusText">
+    Bereit
+  </div>
+</main>
+
+<aside class="rightbar">
+  <div class="section">
+    <div class="section-title">Bildlooks</div>
+    <div class="preset-grid">
+      <button data-preset="original">Original</button>
+      <button data-preset="bright">Hell</button>
+      <button data-preset="warm">Warm</button>
+      <button data-preset="cool">Kühl</button>
+      <button data-preset="portrait">Porträt</button>
+      <button data-preset="cinema">Kino</button>
+      <button data-preset="mono">Schwarzweiß</button>
+      <button data-preset="vintage">Vintage</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Licht</div>
+    <div class="control">
+      <div class="control-head"><span>Belichtung</span><output id="exposureValue">0</output></div>
+      <input id="exposure" type="range" min="-100" max="100" value="0">
+    </div>
+    <div class="control">
+      <div class="control-head"><span>Kontrast</span><output id="contrastValue">0</output></div>
+      <input id="contrast" type="range" min="-100" max="100" value="0">
+    </div>
+    <div class="control">
+      <div class="control-head"><span>Lichter</span><output id="highlightsValue">0</output></div>
+      <input id="highlights" type="range" min="-100" max="100" value="0">
+    </div>
+    <div class="control">
+      <div class="control-head"><span>Tiefen</span><output id="shadowsValue">0</output></div>
+      <input id="shadows" type="range" min="-100" max="100" value="0">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Farben</div>
+    <div class="control">
+      <div class="control-head"><span>Temperatur</span><output id="temperatureValue">0</output></div>
+      <input id="temperature" type="range" min="-100" max="100" value="0">
+    </div>
+    <div class="control">
+      <div class="control-head"><span>Farbton</span><output id="hueValue">0</output></div>
+      <input id="hue" type="range" min="-180" max="180" value="0">
+    </div>
+    <div class="control">
+      <div class="control-head"><span>Sättigung</span><output id="saturationValue">0</output></div>
+      <input id="saturation" type="range" min="-100" max="100" value="0">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Details und Effekte</div>
+    <div class="control">
+      <div class="control-head"><span>Schärfe</span><output id="sharpnessValue">0</output></div>
+      <input id="sharpness" type="range" min="0" max="100" value="0">
+    </div>
+    <div class="control">
+      <div class="control-head"><span>Weichzeichnen</span><output id="blurValue">0</output></div>
+      <input id="blur" type="range" min="0" max="10" value="0">
+    </div>
+    <div class="control">
+      <div class="control-head"><span>Vignette</span><output id="vignetteValue">0</output></div>
+      <input id="vignette" type="range" min="0" max="100" value="0">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Export</div>
+    <div class="control">
+      <div class="control-head"><span>Format</span></div>
+      <select id="exportFormat" class="wide">
+        <option value="image/jpeg">JPG</option>
+        <option value="image/png">PNG</option>
+        <option value="image/webp">WebP</option>
+      </select>
+    </div>
+    <div class="control">
+      <div class="control-head">
+        <span>Qualität</span><output id="qualityValue">92%</output>
+      </div>
+      <input id="quality" type="range" min="10" max="100" value="92">
+    </div>
+    <button id="exportSideButton" class="success wide">Bild herunterladen</button>
+    <p class="small">Der Export erfolgt aus dem aktuellen Bild in der verfügbaren Arbeitsauflösung.</p>
+  </div>
+</aside>
+</div>
+
+<footer>STEFANS BILDBEARBEITUNG · FOTO EDITOR</footer>
+
+<div id="busyOverlay">
+  <div class="modal">
+    <div class="spinner"></div>
+    <h2 id="busyTitle">Bitte warten …</h2>
+    <p id="busyText" class="status">Das Bild wird verarbeitet.</p>
+  </div>
+</div>
+
+<div id="aiOverlay">
+  <div class="modal">
+    <div class="spinner"></div>
+    <h2 id="aiTitle">Die KI arbeitet …</h2>
+    <p id="aiSubtitle" class="status">Das Bild wird analysiert und bearbeitet.</p>
+    <div class="progress"><div id="aiProgress"></div></div>
+    <p class="small" id="aiStep">Schritt 1 von 4</p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+const $=id=>document.getElementById(id);
+const canvas=$("photoCanvas");
+const ctx=canvas.getContext("2d",{willReadFrequently:true});
+const maskCanvas=$("maskCanvas");
+const mctx=maskCanvas.getContext("2d",{willReadFrequently:true});
+
+const defaults={
+  exposure:0,contrast:0,highlights:0,shadows:0,
+  temperature:0,hue:0,saturation:0,
+  sharpness:0,blur:0,vignette:0
+};
+
+let settings={...defaults};
+let originalCanvas=null;
+let currentCanvas=null;
+let imageName="bild";
+let rotation=0;
+let flipH=false;
+let flipV=false;
+let zoom=1;
+let autoFit=true;
+let viewMode="after";
+let brushMode="erase";
+let drawing=false;
+let lastPoint=null;
+let modelSession=null;
+let history=[];
+let historyIndex=-1;
+let toastTimer=null;
+
+const modelSources=[
+ "https://hf-mirror.com/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx",
+ "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx?download=true"
+];
+
+function status(message){
+ $("statusText").textContent=message;
+}
+
+function toast(message){
+ const el=$("toast");
+ el.textContent=message;
+ el.style.display="block";
+ clearTimeout(toastTimer);
+ toastTimer=setTimeout(()=>el.style.display="none",3000);
+}
+
+function busy(show,title="Bitte warten …",message="Das Bild wird verarbeitet."){
+ $("busyOverlay").style.display=show?"flex":"none";
+ $("busyTitle").textContent=title;
+ $("busyText").textContent=message;
+}
+
+function aiStage(stage){
+ const titles=[
+  "Die KI arbeitet …",
+  "Bild wird analysiert …",
+  "Objekt wird entfernt …",
+  "Hintergrund wird rekonstruiert …",
+  "Ergebnis wird fertiggestellt …"
+ ];
+ $("aiTitle").textContent=titles[stage];
+ $("aiStep").textContent="Schritt "+stage+" von 4";
+ $("aiProgress").style.width=(stage*25)+"%";
+}
+
+function cloneCanvas(source){
+ const copy=document.createElement("canvas");
+ copy.width=source.width;
+ copy.height=source.height;
+ copy.getContext("2d").drawImage(source,0,0);
+ return copy;
+}
+
+function saveHistory(){
+ if(!currentCanvas)return;
+ history=history.slice(0,historyIndex+1);
+ history.push({
+  image:cloneCanvas(currentCanvas),
+  settings:{...settings},
+  rotation,flipH,flipV
+ });
+ if(history.length>30)history.shift();
+ historyIndex=history.length-1;
+ updateHistoryButtons();
+}
+
+function updateHistoryButtons(){
+ $("undoButton").disabled=historyIndex<=0;
+ $("redoButton").disabled=historyIndex>=history.length-1;
+}
+
+function restoreHistory(index){
+ if(index<0||index>=history.length)return;
+ const state=history[index];
+ historyIndex=index;
+ currentCanvas=cloneCanvas(state.image);
+ settings={...state.settings};
+ rotation=state.rotation;
+ flipH=state.flipH;
+ flipV=state.flipV;
+ writeSettings();
+ render();
+ updateHistoryButtons();
+ status("Bearbeitungsstand wiederhergestellt");
+}
+
+function undo(){restoreHistory(historyIndex-1)}
+function redo(){restoreHistory(historyIndex+1)}
+
+function writeSettings(){
+ Object.keys(defaults).forEach(key=>{
+  $(key).value=settings[key];
+  $(key+"Value").textContent=settings[key];
+ });
+}
+
+function render(){
+ if(!currentCanvas)return;
+
+ const w=currentCanvas.width;
+ const h=currentCanvas.height;
+
+ canvas.width=w;
+ canvas.height=h;
+ ctx.clearRect(0,0,w,h);
+
+ if(viewMode==="before"&&originalCanvas){
+  ctx.drawImage(originalCanvas,0,0,w,h);
+ }else{
+  ctx.save();
+  ctx.filter=
+   "brightness("+Math.pow(2,settings.exposure/100)*100+"%) "+
+   "contrast("+(100+settings.contrast)+"%) "+
+   "saturate("+(100+settings.saturation)+"%) "+
+   "hue-rotate("+settings.hue+"deg) "+
+   "blur("+settings.blur+"px)";
+  ctx.drawImage(currentCanvas,0,0);
+  ctx.restore();
+
+  if(settings.temperature!==0){
+   ctx.save();
+   ctx.globalAlpha=Math.abs(settings.temperature)/500;
+   ctx.fillStyle=settings.temperature>0?"#ff9c42":"#529bff";
+   ctx.fillRect(0,0,w,h);
+   ctx.restore();
+  }
+
+  if(settings.vignette>0){
+   const gradient=ctx.createRadialGradient(
+    w/2,h/2,Math.min(w,h)*.2,
+    w/2,h/2,Math.max(w,h)*.72
+   );
+   gradient.addColorStop(0,"transparent");
+   gradient.addColorStop(1,"rgba(0,0,0,"+(settings.vignette/130)+")");
+   ctx.fillStyle=gradient;
+   ctx.fillRect(0,0,w,h);
+  }
+
+  if(settings.sharpness>0)sharpen(settings.sharpness);
+ }
+ updateCanvasSize();
+}
+
+function sharpen(amount){
+ if(canvas.width<3||canvas.height<3)return;
+ const w=canvas.width,h=canvas.height;
+ const source=ctx.getImageData(0,0,w,h);
+ const input=source.data;
+ const result=ctx.createImageData(w,h);
+ result.data.set(input);
+ const output=result.data;
+ const strength=amount/180;
+
+ for(let y=1;y<h-1;y++){
+  for(let x=1;x<w-1;x++){
+   const i=(y*w+x)*4;
+   for(let c=0;c<3;c++){
+    const neighbors=
+     input[i-4+c]+input[i+4+c]+
+     input[i-w*4+c]+input[i+w*4+c];
+    output[i+c]=Math.max(0,Math.min(255,
+     input[i+c]+(input[i+c]*4-neighbors)*strength
+    ));
+   }
+  }
+ }
+ ctx.putImageData(result,0,0);
+}
+
+function updateCanvasSize(){
+ if(!currentCanvas)return;
+ const maxW=$("stage").clientWidth-50;
+ const maxH=$("stage").clientHeight-50;
+ const fit=Math.min(maxW/canvas.width,maxH/canvas.height,1);
+ const scale=autoFit?fit:zoom;
+ const displayW=canvas.width*scale;
+ const displayH=canvas.height*scale;
+
+ $("canvasWrap").style.display="block";
+ $("canvasWrap").style.width=displayW+"px";
+ $("canvasWrap").style.height=displayH+"px";
+ canvas.style.width=displayW+"px";
+ canvas.style.height=displayH+"px";
+ maskCanvas.width=canvas.width;
+ maskCanvas.height=canvas.height;
+ maskCanvas.style.width=displayW+"px";
+ maskCanvas.style.height=displayH+"px";
+ $("zoomValue").textContent=Math.round(scale*100)+"%";
+ $("zoomSlider").value=Math.round(scale*100);
+}
+
+function fitImage(){
+ if(!currentCanvas)return;
+ autoFit=true;
+ render();
+}
+
+function zoomBy(factor){
+ if(!currentCanvas)return;
+ if(autoFit){
+  const maxW=$("stage").clientWidth-50;
+  const maxH=$("stage").clientHeight-50;
+  zoom=Math.min(maxW/canvas.width,maxH/canvas.height,1);
+ }
+ autoFit=false;
+ zoom=Math.max(.1,Math.min(2,zoom*factor));
+ render();
+}
+
+async function openFile(file){
+ if(!file)return;
+ busy(true,"Bild wird geöffnet …","Datei wird eingelesen.");
+
+ try{
+  let blob=file;
+  const isHeic=/\.(heic|heif)$/i.test(file.name)||
+   /image\/hei[cf]/i.test(file.type);
+
+  if(isHeic){
+   if(!window.heic2any)throw new Error("HEIC-Konverter nicht verfügbar.");
+   blob=await heic2any({blob:file,toType:"image/jpeg",quality:.96});
+   if(Array.isArray(blob))blob=blob[0];
+  }
+
+  const url=URL.createObjectURL(blob);
+  const img=new Image();
+
+  await new Promise((resolve,reject)=>{
+   img.onload=resolve;
+   img.onerror=()=>reject(new Error("Das Bild konnte nicht geöffnet werden."));
+   img.src=url;
+  });
+
+  const scale=Math.min(1,4000/Math.max(img.width,img.height));
+  const w=Math.max(1,Math.round(img.width*scale));
+  const h=Math.max(1,Math.round(img.height*scale));
+
+  currentCanvas=document.createElement("canvas");
+  currentCanvas.width=w;
+  currentCanvas.height=h;
+  currentCanvas.getContext("2d").drawImage(img,0,0,w,h);
+
+  originalCanvas=cloneCanvas(currentCanvas);
+  imageName=file.name.replace(/\.[^.]+$/,"")||"bild";
+
+  settings={...defaults};
+  rotation=0;flipH=false;flipV=false;
+  viewMode="after";
+  history=[];
+  historyIndex=-1;
+
+  mctx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+  $("empty").style.display="none";
+  $("imageInfo").textContent=
+   file.name+" · "+img.width+" × "+img.height+" px";
+
+  writeSettings();
+  saveHistory();
+  fitImage();
+  status("Bild erfolgreich geöffnet");
+  URL.revokeObjectURL(url);
+ }catch(error){
+  console.error(error);
+  alert(error.message||"Bild konnte nicht geladen werden.");
+ }finally{
+  busy(false);
+  $("fileInput").value="";
+ }
+}
+
+$("fileInput").addEventListener("change",e=>openFile(e.target.files[0]));
+
+function getPoint(event){
+ const rect=maskCanvas.getBoundingClientRect();
+ return {
+  x:(event.clientX-rect.left)*maskCanvas.width/rect.width,
+  y:(event.clientY-rect.top)*maskCanvas.height/rect.height
+ };
+}
+
+function drawBrush(x,y){
+ const size=Number($("brushSize").value);
+ mctx.save();
+ if(brushMode==="erase"){
+  mctx.globalCompositeOperation="source-over";
+  mctx.fillStyle="rgba(255,65,100,.58)";
+ }else{
+  mctx.globalCompositeOperation="destination-out";
+ }
+ mctx.beginPath();
+ mctx.arc(x,y,size/2,0,Math.PI*2);
+ mctx.fill();
+ mctx.restore();
+}
+
+maskCanvas.addEventListener("pointerdown",event=>{
+ if(!currentCanvas||viewMode==="before")return;
+ drawing=true;
+ maskCanvas.setPointerCapture(event.pointerId);
+ lastPoint=getPoint(event);
+ drawBrush(lastPoint.x,lastPoint.y);
+});
+
+maskCanvas.addEventListener("pointermove",event=>{
+ if(!drawing)return;
+ const p=getPoint(event);
+ const distance=Math.hypot(p.x-lastPoint.x,p.y-lastPoint.y);
+ const steps=Math.max(1,Math.ceil(distance/8));
+
+ for(let i=1;i<=steps;i++){
+  const x=lastPoint.x+(p.x-lastPoint.x)*i/steps;
+  const y=lastPoint.y+(p.y-lastPoint.y)*i/steps;
+  drawBrush(x,y);
+ }
+ lastPoint=p;
+});
+
+function stopDrawing(){drawing=false;lastPoint=null}
+maskCanvas.addEventListener("pointerup",stopDrawing);
+maskCanvas.addEventListener("pointercancel",stopDrawing);
+
+$("brushSize").addEventListener("input",e=>{
+ $("brushValue").textContent=e.target.value+" px";
+});
+
+$("eraseBrush").addEventListener("click",()=>{
+ brushMode="erase";
+ $("eraseBrush").classList.add("active");
+ $("restoreBrush").classList.remove("active");
+});
+
+$("restoreBrush").addEventListener("click",()=>{
+ brushMode="restore";
+ $("restoreBrush").classList.add("active");
+ $("eraseBrush").classList.remove("active");
+});
+
+$("clearMaskButton").addEventListener("click",()=>{
+ mctx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+ toast("Markierung gelöscht");
+});
+
+function hasMask(){
+ const data=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height).data;
+ for(let i=3;i<data.length;i+=4)if(data[i]>10)return true;
+ return false;
+}
+
+async function loadModelFromUrl(url){
+ const response=await fetch(url);
+ if(!response.ok)throw new Error("HTTP "+response.status);
+ return await response.arrayBuffer();
+}
+
+async function createModel(buffer){
+ if(!window.ort)throw new Error("ONNX Runtime wurde nicht geladen.");
+
+ ort.env.wasm.wasmPaths="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+ ort.env.wasm.numThreads=1;
+
+ const session=await ort.InferenceSession.create(buffer,{
+  executionProviders:["wasm"],
+  graphOptimizationLevel:"all"
+ });
+
+ if(!session.inputNames.includes("image")||
+    !session.inputNames.includes("mask")){
+  throw new Error("Das Modell besitzt nicht die erwarteten Eingaben.");
+ }
+
+ modelSession=session;
+ $("modelStatus").textContent="✓ KI-Modell ist einsatzbereit.";
+ $("modelStatus").classList.add("ready");
+ $("aiButton").disabled=false;
+}
+
+async function loadModel(){
+ if(modelSession){
+  toast("Das KI-Modell ist bereits geladen.");
+  return;
+ }
+
+ $("loadModelButton").disabled=true;
+ $("modelStatus").textContent="KI-Modell wird geladen …";
+ let error;
+
+ try{
+  for(const url of modelSources){
+   try{
+    await createModel(await loadModelFromUrl(url));
+    toast("KI-Modell erfolgreich geladen");
+    return;
+   }catch(e){
+    error=e;
+    console.warn("Modellquelle fehlgeschlagen",e);
+   }
+  }
+  throw error||new Error("Modell konnte nicht geladen werden.");
+ }catch(e){
+  $("modelStatus").textContent="Laden fehlgeschlagen: "+e.message;
+  toast("KI-Modell konnte nicht geladen werden.");
+ }finally{
+  $("loadModelButton").disabled=false;
+ }
+}
+
+$("loadModelButton").addEventListener("click",loadModel);
+
+$("modelFile").addEventListener("change",async e=>{
+ const file=e.target.files[0];
+ if(!file)return;
+
+ try{
+  $("modelStatus").textContent="Lokales Modell wird geladen …";
+  await createModel(await file.arrayBuffer());
+  toast("Lokales Modell geladen");
+ }catch(error){
+  $("modelStatus").textContent="Fehler: "+error.message;
+  alert(error.message);
+ }
+ e.target.value="";
+});
+
+function makeTensors(){
+ const size=512;
+ const temp=document.createElement("canvas");
+ temp.width=size;temp.height=size;
+ const tctx=temp.getContext("2d",{willReadFrequently:true});
+ tctx.drawImage(currentCanvas,0,0,size,size);
+ const pixels=tctx.getImageData(0,0,size,size).data;
+
+ const maskTemp=document.createElement("canvas");
+ maskTemp.width=size;maskTemp.height=size;
+ const maskCtx=maskTemp.getContext("2d",{willReadFrequently:true});
+ maskCtx.drawImage(maskCanvas,0,0,size,size);
+ const maskPixels=maskCtx.getImageData(0,0,size,size).data;
+
+ const imageTensor=new Float32Array(3*size*size);
+ const maskTensor=new Float32Array(size*size);
+ const plane=size*size;
+
+ for(let i=0;i<plane;i++){
+  imageTensor[i]=pixels[i*4]/255;
+  imageTensor[plane+i]=pixels[i*4+1]/255;
+  imageTensor[2*plane+i]=pixels[i*4+2]/255;
+  maskTensor[i]=maskPixels[i*4+3]>10?1:0;
+ }
+
+ return {
+  image:new ort.Tensor("float32",imageTensor,[1,3,size,size]),
+  mask:new ort.Tensor("float32",maskTensor,[1,1,size,size])
+ };
+}
+
+async function processAI(){
+ if(!currentCanvas)return;
+
+ if(!modelSession){
+  toast("Bitte zuerst das KI-Modell laden.");
+  return;
+ }
+
+ if(!hasMask()){
+  toast("Bitte zuerst ein Objekt markieren.");
+  return;
+ }
+
+ $("aiButton").disabled=true;
+ $("aiOverlay").style.display="flex";
+ aiStage(1);
+
+ try{
+  await new Promise(r=>requestAnimationFrame(r));
+  const tensors=makeTensors();
+
+  aiStage(2);
+  await new Promise(r=>requestAnimationFrame(r));
+
+  const results=await modelSession.run({
+   image:tensors.image,
+   mask:tensors.mask
+  });
+
+  aiStage(3);
+  await new Promise(r=>requestAnimationFrame(r));
+
+  const output=results[modelSession.outputNames[0]];
+  const values=output.data;
+  const size=512;
+  const plane=size*size;
+
+  if(values.length<3*plane){
+   throw new Error("Unerwartetes Ausgabeformat des KI-Modells.");
+  }
+
+  const temp=document.createElement("canvas");
+  temp.width=size;temp.height=size;
+  const tctx=temp.getContext("2d");
+  const image=tctx.createImageData(size,size);
+
+  let max=0;
+  for(let i=0;i<3*plane;i++){
+   max=Math.max(max,Math.abs(values[i]));
+  }
+  const factor=max<=1.5?255:1;
+
+  for(let i=0;i<plane;i++){
+   image.data[i*4]=Math.max(0,Math.min(255,values[i]*factor));
+   image.data[i*4+1]=Math.max(0,Math.min(255,values[plane+i]*factor));
+   image.data[i*4+2]=Math.max(0,Math.min(255,values[2*plane+i]*factor));
+   image.data[i*4+3]=255;
+  }
+  tctx.putImageData(image,0,0);
+
+  aiStage(4);
+
+  const repaired=document.createElement("canvas");
+  repaired.width=currentCanvas.width;
+  repaired.height=currentCanvas.height;
+
+  const rctx=repaired.getContext("2d",{willReadFrequently:true});
+  rctx.drawImage(temp,0,0,repaired.width,repaired.height);
+
+  const original=currentCanvas.getContext("2d",{willReadFrequently:true})
+   .getImageData(0,0,currentCanvas.width,currentCanvas.height);
+  const repairedPixels=rctx.getImageData(0,0,repaired.width,repaired.height);
+  const maskPixels=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
+  const w=currentCanvas.width;
+  const h=currentCanvas.height;
+
+  saveHistory();
+
+  for(let i=0;i<w*h;i++){
+   const p=i*4;
+   const alpha=maskPixels.data[p+3]/255;
+   if(alpha<=.02)continue;
+
+   const blend=Math.min(1,alpha*1.4);
+   for(let c=0;c<3;c++){
+    original.data[p+c]=
+     original.data[p+c]*(1-blend)+repairedPixels.data[p+c]*blend;
+   }
+  }
+
+  currentCanvas.getContext("2d").putImageData(original,0,0);
+  mctx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+  viewMode="after";
+  render();
+  saveHistory();
+  status("KI-Objektentfernung abgeschlossen");
+  toast("Objekt erfolgreich entfernt!");
+
+ }catch(error){
+  console.error(error);
+  alert("Die KI-Bearbeitung ist fehlgeschlagen: "+error.message);
+ }finally{
+  $("aiOverlay").style.display="none";
+  $("aiButton").disabled=false;
+ }
+}
+
+$("aiButton").addEventListener("click",processAI);
+
+async function classicRepair(){
+ if(!currentCanvas||!hasMask())return;
+
+ const w=currentCanvas.width,h=currentCanvas.height;
+ if(w*h>12000000){
+  alert("Das Bild ist für die klassische Reparatur sehr groß. Bitte verkleinere es zuerst.");
+  return;
+ }
+
+ busy(true,"Klassische Reparatur …","Markierte Pixel werden interpoliert.");
+ saveHistory();
+
+ try{
+  const image=currentCanvas.getContext("2d").getImageData(0,0,w,h);
+  const mask=mctx.getImageData(0,0,w,h).data;
+  const selected=new Uint8Array(w*h);
+  const known=new Uint8Array(w*h);
+  let remaining=0;
+
+  for(let i=0;i<w*h;i++){
+   selected[i]=mask[i*4+3]>10?1:0;
+   known[i]=selected[i]?0:1;
+   if(selected[i])remaining++;
+  }
+
+  if(remaining>w*h*.25){
+   throw new Error("Die Markierung ist zu groß. Bitte markiere eine kleinere Fläche.");
+  }
+
+  const data=new Uint8ClampedArray(image.data);
+  let iteration=0;
+
+  while(remaining>0&&iteration<Math.max(w,h)){
+   const updates=[];
+
+   for(let y=1;y<h-1;y++){
+    for(let x=1;x<w-1;x++){
+     const index=y*w+x;
+     if(!selected[index]||known[index])continue;
+
+     const neighbors=[index-1,index+1,index-w,index+w];
+     let r=0,g=0,b=0,count=0;
+
+     for(const n of neighbors){
+      if(known[n]){
+       r+=data[n*4];
+       g+=data[n*4+1];
+       b+=data[n*4+2];
+       count++;
+      }
+     }
+
+     if(count>=2)updates.push([index,r/count,g/count,b/count]);
+    }
+   }
+
+   if(!updates.length)break;
+
+   for(const [index,r,g,b] of updates){
+    data[index*4]=r;
+    data[index*4+1]=g;
+    data[index*4+2]=b;
+    data[index*4+3]=255;
+    known[index]=1;
+    remaining--;
+   }
+
+   iteration++;
+   if(iteration%5===0){
+    $("busyText").textContent="Reparatur läuft …";
+    await new Promise(r=>setTimeout(r,0));
+   }
+  }
+
+  if(remaining>0){
+   throw new Error("Die markierte Fläche konnte nicht vollständig repariert werden.");
+  }
+
+  currentCanvas.getContext("2d").putImageData(new ImageData(data,w,h),0,0);
+  mctx.clearRect(0,0,w,h);
+  render();
+  saveHistory();
+  toast("Klassische Reparatur abgeschlossen");
+
+ }catch(error){
+  undo();
+  alert(error.message);
+ }finally{
+  busy(false);
+ }
+}
+
+$("classicButton").addEventListener("click",classicRepair);
+
+function setCompare(mode){
+ viewMode=mode;
+ $("beforeButton").classList.toggle("active",mode==="before");
+ $("afterButton").classList.toggle("active",mode==="after");
+ render();
+}
+
+$("beforeButton").addEventListener("click",()=>setCompare("before"));
+$("afterButton").addEventListener("click",()=>setCompare("after"));
+$("compareButton").addEventListener("click",()=>{
+ setCompare(viewMode==="before"?"after":"before");
+});
+
+function rotate(degrees){
+ if(!currentCanvas)return;
+
+ saveHistory();
+
+ const w=currentCanvas.width,h=currentCanvas.height;
+ const out=document.createElement("canvas");
+ out.width=Math.abs(degrees)%180===90?h:w;
+ out.height=Math.abs(degrees)%180===90?w:h;
+
+ const c=out.getContext("2d");
+ c.translate(out.width/2,out.height/2);
+ c.rotate(degrees*Math.PI/180);
+ c.drawImage(currentCanvas,-w/2,-h/2);
+
+ currentCanvas=out;
+ originalCanvas=cloneCanvas(out);
+ render();
+ saveHistory();
+}
+
+$("rotateLeft").addEventListener("click",()=>rotate(-90));
+$("rotateRight").addEventListener("click",()=>rotate(90));
+
+function flip(horizontal){
+ if(!currentCanvas)return;
+
+ saveHistory();
+
+ const out=document.createElement("canvas");
+ out.width=currentCanvas.width;
+ out.height=currentCanvas.height;
+
+ const c=out.getContext("2d");
+ c.translate(horizontal?out.width:0,horizontal?0:out.height);
+ c.scale(horizontal?-1:1,horizontal?1:-1);
+ c.drawImage(currentCanvas,0,0);
+
+ currentCanvas=out;
+ originalCanvas=cloneCanvas(out);
+ render();
+ saveHistory();
+}
+
+$("flipH").addEventListener("click",()=>flip(true));
+$("flipV").addEventListener("click",()=>flip(false));
+
+function cropSquare(){
+ if(!currentCanvas)return;
+
+ const w=currentCanvas.width,h=currentCanvas.height;
+ const size=Math.min(w,h);
+ const x=Math.round((w-size)/2);
+ const y=Math.round((h-size)/2);
+
+ const out=document.createElement("canvas");
+ out.width=size;
+ out.height=size;
+ out.getContext("2d").drawImage(
+  currentCanvas,x,y,size,size,0,0,size,size
+ );
+
+ saveHistory();
+ currentCanvas=out;
+ originalCanvas=cloneCanvas(out);
+ render();
+ saveHistory();
+ toast("Quadratischer Zuschnitt übernommen");
+}
+
+$("cropButton").addEventListener("click",cropSquare);
+
+$("zoomIn").addEventListener("click",()=>zoomBy(1.2));
+$("zoomOut").addEventListener("click",()=>zoomBy(.8));
+$("fitButton").addEventListener("click",fitImage);
+$("fitToolbar").addEventListener("click",fitImage);
+
+$("zoomSlider").addEventListener("input",e=>{
+ zoom=Number(e.target.value)/100;
+ autoFit=false;
+ render();
+});
+
+Object.keys(defaults).forEach(key=>{
+ $(key).addEventListener("input",()=>{
+  settings[key]=Number($(key).value);
+  $(key+"Value").textContent=settings[key];
+  render();
+ });
+});
+
+const presets={
+ original:{},
+ bright:{exposure:25,shadows:20,contrast:8},
+ warm:{temperature:28,saturation:10},
+ cool:{temperature:-25,contrast:8},
+ portrait:{exposure:10,shadows:18,highlights:-15,saturation:-8,sharpness:12},
+ cinema:{contrast:25,shadows:-12,highlights:-25,saturation:-20,vignette:35,temperature:8},
+ mono:{saturation:-100,contrast:18},
+ vintage:{temperature:25,saturation:-25,contrast:-12,vignette:30}
+};
+
+document.querySelectorAll("[data-preset]").forEach(button=>{
+ button.addEventListener("click",()=>{
+  if(!currentCanvas)return;
+  settings={...defaults,...presets[button.dataset.preset]};
+  writeSettings();
+  render();
+  saveHistory();
+  status("Bildlook angewendet: "+button.textContent);
+ });
+});
+
+function resetImage(){
+ if(!originalCanvas)return;
+
+ currentCanvas=cloneCanvas(originalCanvas);
+ settings={...defaults};
+ writeSettings();
+ viewMode="after";
+ mctx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+ render();
+ saveHistory();
+ toast("Bild zurückgesetzt");
+}
+
+$("resetButton").addEventListener("click",resetImage);
+$("undoButton").addEventListener("click",undo);
+$("redoButton").addEventListener("click",redo);
+
+function exportImage(){
+ if(!currentCanvas)return;
+
+ busy(true,"Export wird vorbereitet …","Das bearbeitete Bild wird erstellt.");
+
+ setTimeout(()=>{
+  try{
+   const output=document.createElement("canvas");
+   output.width=currentCanvas.width;
+   output.height=currentCanvas.height;
+
+   const c=output.getContext("2d");
+   c.filter=
+    "brightness("+Math.pow(2,settings.exposure/100)*100+"%) "+
+    "contrast("+(100+settings.contrast)+"%) "+
+    "saturate("+(100+settings.saturation)+"%) "+
+    "hue-rotate("+settings.hue+"deg) "+
+    "blur("+settings.blur+"px)";
+
+   c.drawImage(currentCanvas,0,0);
+
+   if(settings.temperature!==0){
+    c.save();
+    c.globalAlpha=Math.abs(settings.temperature)/500;
+    c.fillStyle=settings.temperature>0?"#ff9c42":"#529bff";
+    c.fillRect(0,0,output.width,output.height);
+    c.restore();
+   }
+
+   if(settings.vignette>0){
+    const gradient=c.createRadialGradient(
+     output.width/2,output.height/2,Math.min(output.width,output.height)*.2,
+     output.width/2,output.height/2,Math.max(output.width,output.height)*.72
+    );
+    gradient.addColorStop(0,"transparent");
+    gradient.addColorStop(1,"rgba(0,0,0,"+(settings.vignette/130)+")");
+    c.fillStyle=gradient;
+    c.fillRect(0,0,output.width,output.height);
+   }
+
+   const format=$("exportFormat").value;
+   const quality=Number($("quality").value)/100;
+   const extension=format==="image/jpeg"?"jpg":
+    format==="image/webp"?"webp":"png";
+
+   output.toBlob(blob=>{
+    busy(false);
+
+    if(!blob){
+     alert("Export fehlgeschlagen.");
+     return;
+    }
+
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download=imageName+"-bearbeitet."+extension;
+    link.click();
+
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    status("Export abgeschlossen");
+    toast("Bild wurde heruntergeladen");
+   },format,quality);
+
+  }catch(error){
+   busy(false);
+   alert("Export fehlgeschlagen: "+error.message);
+  }
+ },30);
+}
+
+$("exportButton").addEventListener("click",exportImage);
+$("exportSideButton").addEventListener("click",exportImage);
+
+$("quality").addEventListener("input",e=>{
+ $("qualityValue").textContent=e.target.value+"%";
+});
+
+window.addEventListener("resize",()=>{
+ if(currentCanvas&&autoFit)render();
+});
+
+updateHistoryButtons();
+</script>
+</body>
+</html>

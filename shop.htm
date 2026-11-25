@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fotokalender fuer 2027 — Stefan Wehner Fotografie</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-validate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --accent-primary: #0f172a;
+            --accent-gold: #b45309;
+            --badge-bg: #f1f5f9;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.7;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .announcement-bar {
+            background: #0f172a;
+            color: #fff;
+            text-align: center;
+            padding: 0.6rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        nav {
+            padding: 2.5rem 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 4rem;
+        }
+
+        .brand {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: var(--text-main);
+        }
+
+        .nav-status {
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #059669;
+            background: #d1fae5;
+            padding: 0.4rem 0.9rem;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background-color: #059669;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        header {
+            text-align: center;
+            max-width: 1024px;
+            margin: 0 auto 5rem;
+        }
+
+        header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 3.5rem;
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.2rem;
+            color: var(--text-main);
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            font-weight: 300;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2.5rem;
+            margin-bottom: 5rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .card:hover {
+            transform: translateY(-6px);
+            border-color: var(--border-hover);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06);
+        }
+
+        .card-featured {
+            border: 2px solid var(--text-main);
+            background: linear-gradient(180deg, #ffffff 0%, #fcfbf9 100%);
+        }
+
+        .card-tag {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 0.3rem 0.8rem;
+            border-radius: 6px;
+            background: var(--badge-bg);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .tag-highlight {
+            background: #0f172a;
+            color: #fff;
+        }
+
+        .preview-box {
+            width: 100%;
+            height: 240px;
+            border-radius: 12px;
+            background: #f1f5f9;
+            border: 1px dashed #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+            font-weight: 500;
+        }
+
+        .card h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 0.8rem;
+            color: var(--text-main);
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 300;
+            margin-bottom: 2rem;
+            flex-grow: 1;
+        }
+
+        .specs {
+      		display: flex;
+    		flex-direction: column; /* Bringt die Punkte untereinander */
+    		gap: 0.4rem;           /* Etwas Abstand zwischen den Zeilen */
+    		margin-bottom: 1.8rem;
+    		border-top: 1px solid var(--border);
+    		padding-top: 1.2rem;
+    		font-size: 0.8rem;
+    		color: var(--text-muted);
+        }
+
+        .price-section {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .price {
+            font-size: 2rem;
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .price-sub {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        
+        .legal-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            display: block;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 1.1rem 1.5rem;
+            border-radius: 12px;
+            background: var(--accent-primary);
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .btn:hover { background: #334155; transform: scale(1.01); }
+        .btn-gold { background: #b45309; }
+        .btn-gold:hover { background: #92400e; }
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 4rem 0;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 300;
+        }
+
+        footer button {
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-weight: 500;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 0.85rem;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 0;
+            margin: 0 0.5rem;
+        }
+        footer button:hover { color: #b45309; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .modal-content {
+            background: #ffffff;
+            color: #0f172a;
+            width: 100%;
+            max-width: 650px;
+            max-height: 85vh;
+            border-radius: 20px;
+            padding: 2.5rem;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            text-align: left;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: #f1f5f9;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0f172a;
+            transition: background 0.2s;
+        }
+        .close-btn:hover { background: #e2e8f0; }
+
+        .modal-content h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.8rem;
+            margin-bottom: 1.2rem;
+            color: #0f172a;
+        }
+
+        .modal-content h4 {
+            font-size: 1rem;
+            margin-top: 1.2rem;
+            margin-bottom: 0.3rem;
+            color: #0f172a;
+        }
+
+        .modal-content p, .modal-content li {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 0.8rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+	<a href="https://www.stefan-wehner.de"><-- Zurueck zur Startseite...<--</a href>
+<div class="announcement-bar">
+    📦 Vorbestellungsphase läuft – Pünktliche Auslieferung im November/Dezember 2026.
+</div>
+
+<div class="container">
+    
+
+    <header>
+        <h1>53 Wochen Amerika. Natur, Architektur. Landschaften und Staedte.
+		Oder 12 Monate exotisches Afrika. Tiere. Menschen. Farben.
+	</h1>
+        <p>Wahlweise exklusive, limitierte Tischkalender zum Aufstellen im praktischen Format, oder DIN A4 grosse Wandkalender zum aufhaengen. Gedruckt auf Fine-Art Papier mit brillanten Farben.</p>
+        <p>Einfach und bequem via PayPal, Kreditkarte, Klarna, etc. bezahlbar. Bei Ueberweisung bitte auf Anfrage per Mail an info@stefan-wehner.de.</p>
+    </header>
+
+    <div class="grid">
+        
+
+<div class="card">
+            <span class="card-tag">Amerika</span>
+            <img src="kalender-usa.jpg" alt="Cover 50 Staaten USA Kalender" style="width: 100%; height: 240px; object-fit: cover; border-radius: 12px; margin-bottom: 2rem; display: block;">
+            <h2>50 Staaten USA</h2>
+            <p>Jede Woche ein neuer Bundesstaat. 54 selbstbereiste Motive – von einsamen Wüstenstraßen bis hin zu legendären Küsten-Highways.</p>
+            <div class="specs">
+                <span>• Tischkalender z. aufstellen</span>
+                <span>• 54 Kalenderblätter</span>
+                <span>• 135g Premium-Papier</span>
+                <span>• Spiralbindung</span>
+            </div>
+            <div class="price-section">
+                <div class="price">16,99 €</div>
+                <div class="price-sub">inklusive Versand!</div>
+            </div>
+            <span class="legal-hint">(Kleinunternehmer, gemäß § 19 UStG wird keine Umsatzsteuer ausgewiesen.)</span>
+
+            <!-- Zahlungsoption 1: Stripe (Empfohlen wegen automatischer Adressabfrage) -->
+            <div style="margin-top: 20px;">
+                <a href="https://buy.stripe.com/3cI7sK1Ih3LMaac38w2Ji02" class="btn" target="_blank" rel="noopener">
+                   zur Zahlungsabwicklung 
+                </a>
+            </div>
+
+            <!-- Trennlinie / ODER-Hinweis -->
+            <div style="text-align: center; margin: 12px 0; font-size: 0.85rem; color: #64748b; font-weight: 500;">
+                — oder —
+            </div>
+
+            <!-- Zahlungsoption 2: PayPal (mit deinem gewohnten Hinweis für die Lieferadresse) -->
+            <div>
+                <div style="background-color: #f8fafc; border-left: 4px solid #c4a484; padding: 8px 12px; margin-bottom: 8px; border-radius: 4px; font-size: 0.8rem; text-align: left; color: #475569;">
+                    <strong>Hinweis bei PayPal:</strong> Bitte im nächsten Schritt im Feld <em>Wofür ist das?</em> unbedingt die <strong>vollständige Lieferadresse</strong> eintragen!
+                </div>
+                <a href="https://paypal.me/StefanWehner885/16.99EUR" class="btn" target="_blank" rel="noopener" style="background-color: #0070ba;">
+                    Mit PayPal bezahlen
+                </a>
+            </div>
+        </div>
+
+
+
+<div class="card">
+            <span class="card-tag">Afrika</span>
+            <img src="kalender-afrika.jpg" alt="Cover Best of Afrika" style="width: 100%; height: 240px; object-fit: cover; border-radius: 12px; margin-bottom: 2rem; display: block;">
+            <h2>Best of Afrika</h2>
+            <p>Abenteuer pur. Spektakuläre Aufnahmen abseits ausgetretener Pfade. In jedem Monat ein Highlight aus einem anderen afrikanischen Land!</p>
+            <div class="specs">
+                <span>• Wandkalender DIN A4 z. aufhaengen</span>
+                <span>• 13 Kalenderblätter</span>
+                <span>• 135g Premium-Papier</span>
+                <span>• Spiralbindung</span>
+            </div>
+            <div class="price-section">
+                <div class="price">16,99 €</div>
+                <div class="price-sub">inklusive Versand!</div>
+            </div>
+            <span class="legal-hint">(Kleinunternehmer, gemäß § 19 UStG wird keine Umsatzsteuer ausgewiesen.)</span>
+
+            <!-- Zahlungsoption 1: Stripe (Empfohlen wegen automatischer Adressabfrage) -->
+            <div style="margin-top: 20px;">
+                <a href="https://buy.stripe.com/00w6oGgDb0zA4PS8sQ2Ji03" class="btn" target="_blank" rel="noopener">
+                    zur Zahlungsabwicklung
+                </a>
+            </div>
+
+            <!-- Trennlinie / ODER-Hinweis -->
+            <div style="text-align: center; margin: 12px 0; font-size: 0.85rem; color: #64748b; font-weight: 500;">
+                — oder —
+            </div>
+
+            <!-- Zahlungsoption 2: PayPal (mit Hinweis für die Lieferadresse) -->
+            <div>
+                <div style="background-color: #f8fafc; border-left: 4px solid #c4a484; padding: 8px 12px; margin-bottom: 8px; border-radius: 4px; font-size: 0.8rem; text-align: left; color: #475569;">
+                    <strong>Hinweis bei PayPal:</strong> Bitte im nächsten Schritt im Feld <em>Wofür ist das?</em> unbedingt die <strong>vollständige Lieferadresse</strong> eintragen!
+                </div>
+                <a href="https://paypal.me/StefanWehner885/16.99EUR" class="btn" target="_blank" rel="noopener" style="background-color: #0070ba;">
+                    Mit PayPal bezahlen
+                </a>
+            </div>
+        </div>
+
+
+
+
+
+<div class="card card-featured">
+            <span class="card-tag tag-highlight">Spar-Tipp</span>
+            <img src="kalender-usa-afrika.jpg" alt="Cover Doppelpack USA und Afrika" style="width: 100%; height: 240px; object-fit: cover; border-radius: 12px; margin-bottom: 2rem; display: block;">
+            <h2>Das Sammler-Set</h2>
+            <p>Beide Meisterwerke im Vorteilspaket. Das perfekte Geschenk für Reiselustige, Ästheten und Liebhaber echter Dokumentarfotografie.</p>
+            <div class="specs">
+                <span>• Beide Kalender</span>
+                <span>• Signiert (falls gewuenscht)</span>
+                <span>• Preisvorteil</span>
+            </div>
+            <div class="price-section">
+                <div class="price">30,00 €</div>
+                <div class="price-sub">inklusive Versand!</div>
+            </div>
+            <span class="legal-hint">(Kleinunternehmer, gemäß § 19 UStG wird keine Umsatzsteuer ausgewiesen.)</span>
+
+            <!-- Zahlungsoption 1: Stripe (Empfohlen wegen automatischer Adressabfrage) -->
+            <div style="margin-top: 20px;">
+                <a href="https://buy.stripe.com/7sY9AS9aJfuubeg24s2Ji04" class="btn" target="_blank" rel="noopener">
+                    zur Zahlungsabwicklung
+                </a>
+            </div>
+
+            <!-- Trennlinie / ODER-Hinweis -->
+            <div style="text-align: center; margin: 12px 0; font-size: 0.85rem; color: #64748b; font-weight: 500;">
+                — oder —
+            </div>
+
+            <!-- Zahlungsoption 2: PayPal (mit Hinweis für die Lieferadresse) -->
+            <div>
+                <div style="background-color: #f8fafc; border-left: 4px solid #c4a484; padding: 8px 12px; margin-bottom: 8px; border-radius: 4px; font-size: 0.8rem; text-align: left; color: #475569;">
+                    <strong>Hinweis bei PayPal:</strong> Bitte im nächsten Schritt im Feld <em>Wofür ist das?</em> unbedingt die <strong>vollständige Lieferadresse</strong> eintragen!
+                </div>
+                <a href="https://paypal.me/StefanWehner885/30.00EUR" class="btn" target="_blank" rel="noopener" style="background-color: #0070ba;">
+                    Mit PayPal bezahlen
+                </a>
+            </div>
+        </div>
+
+
+
+
+
+    </div>
+
+</div>
+
+<footer>
+    <p>&copy; 2026 Stefan Wehner Fotografie &bull; 
+        <button onclick="openModal('impressumModal')">Impressum</button> &bull; 
+        <button onclick="openModal('datenschutzModal')">Datenschutz</button> &bull; 
+        <button onclick="openModal('widerrufModal')">Widerruf</button> &bull; 
+        <button onclick="openModal('agbModal')">AGB</button>
+    </p>
+    <p style="margin-top: 0.4rem; color: #94a3b8; font-size: 0.8rem;">Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>
+</footer>
+
+<div id="impressumModal" class="modal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal('impressumModal')">&times;</button>
+        <h3>Impressum</h3>
+        <h4>Angaben gemäß § 5 DDG</h4>
+        <p><strong>Stefan Wehner</strong><br>Baunscheidtstrasse 8<br>53173 Bonn</p>
+        <h4>Kontakt</h4>
+        <p>Telefon: 0228 96140375<br>E-Mail: info@stefan-wehner.de</p>
+        <h4>Verbraucherstreitbeilegung</h4>
+        <p>Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit, die Sie unter https://ec.europa.eu/consumers/odr finden. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
+    </div>
+</div>
+
+<div id="datenschutzModal" class="modal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal('datenschutzModal')">&times;</button>
+        <h3>Datenschutzerklärung</h3>
+        <h4>Verantwortlicher</h4>
+        <p>Stefan Wehner, Baunscheidtstrasse 8, 53173 Bonn. E-Mail: info@stefan-wehner.de</p>
+        <h4>Zweck der Datenverarbeitung</h4>
+        <p>Die Verarbeitung Ihrer personenbezogenen Daten (Name, Anschrift, E-Mail) dient ausschließlich der ordnungsgemäßen Abwicklung Ihrer Bestellung und der Auslieferung der bestellten Ware.</p>
+        <h4>Zahlungsabwicklung via PayPal</h4>
+        <p>Für die Zahlung nutzen wir den Dienstleister PayPal (Europe) S.à r.l. et Cie, S.C.A., 22-24 Boulevard Royal, L-2449 Luxembourg. Es gelten die Datenschutzbestimmungen von PayPal. Die Übermittlung erfolgt zur Erfüllung des Kaufvertrags.</p>
+    </div>
+</div>
+
+<div id="widerrufModal" class="modal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal('widerrufModal')">&times;</button>
+        <h3>Widerrufsbelehrung</h3>
+        <h4>Widerrufsrecht</h4>
+        <p>Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag, an dem Sie oder ein von Ihnen benannter Dritter die Ware in Besitz genommen haben.</p>
+        <h4>Ausübung des Widerrufs</h4>
+        <p>Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (Stefan Wehner, Baunscheidtstrasse 8, 53173 Bonn, E-Mail: info@stefan-wehner.de) mittels einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief oder E-Mail) über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren.</p>
+        <h4>Folgen des Widerrufs</h4>
+        <p>Wir haben alle Zahlungen, die wir von Ihnen erhalten haben, einschließlich der Lieferkosten, unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf bei uns eingegangen ist. Wir können die Rückzahlung verweigern, bis wir die Waren wieder zurückerhalten haben. Sie tragen die unmittelbaren Kosten der Rücksendung der Waren.</p>
+    </div>
+</div>
+
+<div id="agbModal" class="modal">
+    <div class="modal-content">
+        <button class="close-btn" onclick="closeModal('agbModal')">&times;</button>
+        <h3>Allgemeine Geschäftsbedingungen</h3>
+        <h4>§ 1 Geltungsbereich</h4>
+        <p>Diese AGB gelten für alle Bestellungen von Kalendern, die über diese Website getätigt werden.</p>
+        <h4>§ 2 Vertragsschluss</h4>
+        <p>Die Darstellung der Produkte ist kein rechtlich bindendes Angebot. Mit der Zahlung via PayPal geben Sie ein verbindliches Kaufangebot ab. Der Vertrag kommt mit der Annahme des Kaufs durch den Versand der Ware zustande.</p>
+        <h4>§ 3 Preise und Versandkosten</h4>
+        <p>Es gelten die zum Zeitpunkt der Bestellung aufgeführten Preise. Alle Preise sind Endpreise (Kleinunternehmer gemäß § 19 UStG). Die Lieferung erfolgt Versandkostenfrei, wie angegeben.</p>
+        <h4>§ 4 Eigentumsvorbehalt</h4>
+        <p>Die gelieferte Ware bleibt bis zur vollständigen Bezahlung Eigentum von Stefan Wehner.</p>
+        <h4>§ 5 Gewährleistung</h4>
+        <p>Es gelten die gesetzlichen Mängelhaftungsrechte.</p>
+    </div>
+</div>
+
+<script>
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = "flex";
+    }
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = "none";
+    }
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = "none";
+        }
+    }
+</script>
+
+</body>
+</html>
